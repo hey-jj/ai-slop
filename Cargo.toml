@@ -1,0 +1,55 @@
+[package]
+name = "ai-slop"
+version = "0.1.1"
+edition = "2021"
+rust-version = "1.85"
+license = "MIT OR Apache-2.0"
+description = "Deterministic detector and coverage instrument for generated-text defects in outbound technical artifacts"
+keywords = ["lint", "detector", "markdown", "text", "policy"]
+categories = ["command-line-utilities", "text-processing"]
+readme = "README.md"
+repository = "https://github.com/hey-jj/ai-slop"
+include = [
+    "src/**",
+    "policy/**",
+    "Cargo.toml",
+    "README.md",
+    "LICENSE-MIT",
+    "LICENSE-APACHE",
+]
+
+[dependencies]
+pulldown-cmark = { version = "0.13", default-features = false }
+aho-corasick = "1.1"
+regex-automata = { version = "0.4", default-features = false, features = [
+    "std",
+    "syntax",
+    "dfa-build",
+    "dfa-search",
+    "hybrid",
+    "perf-inline",
+    "unicode-bool",
+    "unicode-case",
+    "unicode-perl",
+] }
+regex-syntax = { version = "0.8", default-features = false, features = [
+    "std",
+    "unicode",
+] }
+unicode-ident = "1"
+unicode-normalization = "0.1"
+sha2 = "0.10"
+serde = { version = "1", features = ["derive"] }
+serde_json = { version = "1", features = ["raw_value"] }
+toml = "0.8"
+lexopt = "0.3"
+
+[dev-dependencies]
+proptest = "1"
+
+[[bin]]
+name = "ai-slop"
+path = "src/bin/ai-slop.rs"
+
+[profile.release]
+lto = true
