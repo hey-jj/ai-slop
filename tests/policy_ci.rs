@@ -47,7 +47,7 @@ fn every_rule_has_guard_tier_lifecycle_and_profiles() {
 #[test]
 fn engines_compile_once_and_load() {
     let cp = ai_slop::engine::compiled().expect("policy compiles");
-    assert_eq!(cp.pkg.rules.len(), 72);
+    assert_eq!(cp.pkg.rules.len(), 73);
 }
 
 #[test]

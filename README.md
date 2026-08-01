@@ -1,12 +1,12 @@
 # `ai-slop`
 
-Deterministic detector and coverage instrument for generated-text defects in
-outbound technical artifacts: public bug reports, commit messages, changelogs,
-release notes, readmes, API docs, crate metadata, and internal docs.
+A lint for text you are about to ship: bug reports, commit messages,
+changelogs, release notes, READMEs, API docs, crate metadata, and internal
+docs. It flags AI slop before the text goes out.
 
-The tool detects. It never judges, approves, or edits an artifact. Findings
-carry byte spans into the exact payload that was hashed, and every result
-binds the artifact hash, the policy digest, and the declared profile.
+Findings carry byte spans into the exact bytes that were hashed, and every
+result records the artifact hash, the policy digest, and the profile, so
+the same input and policy always give the same result.
 
 ## Usage
 
@@ -29,19 +29,19 @@ stdout carries one JSON result and nothing else. Diagnostics go to stderr.
 | 30 | instrumentation error, fail closed |
 | 40 | unsupported input, fail closed |
 
-Exit 0 never means clean. Consumers read the coverage block and treat any
-unknown result state as fail-closed.
+Exit 0 on its own does not mean the artifact is clean: check the coverage
+block, and treat any result state you do not recognize as a failure.
 
 ## Profiles
 
-The caller declares one of eight profiles. There is no default and no
-detection: `public-bug-report`, `commit-message`, `changelog`,
+Each run takes exactly one of eight profiles, and there is no default:
+`public-bug-report`, `commit-message`, `changelog`,
 `release-notes`, `readme`, `api-docs`, `cargo-metadata`, `internal-doc`.
 
 ## Segmentation
 
-Tokens quoted in code formatting never fire the prose rules. The fixture
-below stays in this readme as a standing check of that contract:
+Prose rules skip anything in code formatting. The block below stays in
+this README as a regression check of that:
 
 ```text
 Co-authored-by: Claude <noreply@anthropic.com>

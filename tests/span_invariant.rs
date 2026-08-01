@@ -1,5 +1,5 @@
 //! Section 12.3: `source[start..end] == snippet` for every finding on every
-//! corpus file, segmentation total coverage, duplicate substrings, nested
+//! input, segmentation total coverage, duplicate substrings, nested
 //! markdown, multibyte and CRLF cases.
 
 mod common;
@@ -7,7 +7,7 @@ mod common;
 use ai_slop::Profile;
 use common::{assert_invariants, run};
 
-const CORPUS: &[&str] = &[
+const INPUTS: &[&str] = &[
     "We delve into things.\n",
     "Plain text, no markdown constructs at all.",
     "# Head\n\nA — dash and a ; semicolon.\n\n```rust\nlet x = 1; // delve\n```\n",
@@ -29,8 +29,8 @@ const CORPUS: &[&str] = &[
 ];
 
 #[test]
-fn span_invariant_over_corpus() {
-    for text in CORPUS {
+fn span_invariant_over_inputs() {
+    for text in INPUTS {
         for profile in [
             Profile::PublicBugReport,
             Profile::Readme,

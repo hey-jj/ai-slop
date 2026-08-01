@@ -138,6 +138,25 @@ guard = "Exempt when the object is a concrete typographic or UI action (highligh
 judge = "Is the word doing work a plain verb would do, or naming a concrete measured change?"
 profiles = { default = "apply" }
 
+[[rule]]
+id = "SLOP-A004"
+name = "inflated-diction"
+family = "ornamental"
+tier = "candidate"
+lifecycle = "blocking"
+origin = "autopsy"
+view = "norm"
+match = { kind = "word-set", lexicon = "words/inflated-diction.txt", case = "insensitive", boundary = "word" }
+patterns = [
+  '(?i)\b(coverage|detection|analysis|review|validation|verification|evaluation|enforcement|linting|compliance)\s{1,8}instruments?\b',
+  '(?i)\b(generated|synthesized|produced|emitted)-(text|content|output|prose)\s{1,8}(defects?|artifacts?|issues?|surfaces?|concerns?)\b',
+]
+guard = "Curated inflated-substitution tells, kept deliberately small because the failure mode here is flooding dense legitimate technical prose: utilize/facilitate/operationalize where use, help, or run would do, aforementioned, and utilization outside a named resource metric (cpu utilization, memory utilization, and the other listed collocations are exempt). The leverage verb family already blocks under SLOP-A001 and is not duplicated. The first pattern targets the tool-noun stack (coverage instrument, detection instrument): the music, finance, avionics, and measurement senses (a financial instrument, instrument panel, a measurement instrument) and the verb sense (instrument the allocator) follow none of the listed modifiers and never fire; the one residual is an imperative verb directly after a listed noun with its comma omitted (to measure coverage instrument each block), left to the judge line. The second pattern targets the participial noun stack (generated-text defects). Pattern hits do not consult exemptions."
+judge = "Would the plain word (use, help, run, tool) lose information here?"
+profiles = { default = "apply" }
+[rule.exemptions]
+utilization = ["cpu utilization", "gpu utilization", "memory utilization", "heap utilization", "disk utilization", "bandwidth utilization", "link utilization", "resource utilization", "capacity utilization", "cache utilization", "core utilization", "pool utilization", "queue utilization", "utilization rate", "utilization ratio"]
+
 # ---------------------------------------------------------------------------
 # Family P: provider artifacts
 # ---------------------------------------------------------------------------

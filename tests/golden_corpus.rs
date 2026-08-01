@@ -1,4 +1,4 @@
-//! Section 12.1 and 12.6: golden corpus seeded from the two incident-program
+//! Section 12.1 and 12.6: golden fixtures seeded from two real
 //! bug reports, plus a golden segmentation map for a representative
 //! document.
 

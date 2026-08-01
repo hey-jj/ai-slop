@@ -9,7 +9,6 @@ reference implementation of
 small-lib
 claude
 research
-ai
 automated analysis
 audit
 audited

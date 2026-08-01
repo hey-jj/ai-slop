@@ -64,6 +64,10 @@ pub const LEXICONS: &[(&str, &str)] = &[
         include_str!("../policy/words/importance-adjectives.txt"),
     ),
     (
+        "words/inflated-diction.txt",
+        include_str!("../policy/words/inflated-diction.txt"),
+    ),
+    (
         "words/injection.txt",
         include_str!("../policy/words/injection.txt"),
     ),

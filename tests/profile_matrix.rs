@@ -105,9 +105,9 @@ fn known_matrix_points() {
 #[test]
 fn tier_counts_are_pinned() {
     let pkg = policy::load().unwrap();
-    assert_eq!(pkg.rules.len(), 72);
+    assert_eq!(pkg.rules.len(), 73);
     let count = |t: Tier| pkg.rules.iter().filter(|r| r.tier == t).count();
     assert_eq!(count(Tier::Violation), 30);
-    assert_eq!(count(Tier::Candidate), 38);
+    assert_eq!(count(Tier::Candidate), 39);
     assert_eq!(count(Tier::CoverageHint), 4);
 }

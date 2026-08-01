@@ -1,4 +1,4 @@
-//! Calibration coverage from a large real-markdown corpus run: table-cell
+//! Calibration coverage against real-world markdown: table-cell
 //! barriers — no match may fuse across the `|` cell delimiter; A002
 //! `harness` narrowed to the verb-with-object slop
 //! form; and mention-vs-use — the code-span authoring convention for
@@ -11,7 +11,7 @@ use common::{assert_invariants, has_rule, run};
 
 // --- Table cells scanned as prose must not fuse across cell delimiters ------
 
-/// Corpus evidence: S001 (`^--\s{1,8}\S`) and M001 (`\s--\s`) fired on table
+/// S001 (`^--\s{1,8}\S`) and M001 (`\s--\s`) can otherwise fire on table
 /// placeholder-dash cells by pairing one cell's `--` with the NEXT cell's
 /// text across the Block newline. The cell-end barrier must stop both.
 #[test]
@@ -142,8 +142,8 @@ fn a002_determiner_less_verb_slop_fires() {
     }
 }
 
-/// Corpus evidence: A002 fired 90 times on NOUN uses of `harness`. The rule
-/// requires the slop VERB construction — determiner+object, a preceding
+/// NOUN uses of `harness` dominate real technical prose and must pass. The
+/// rule requires the slop VERB construction — determiner+object, a preceding
 /// verb/subject signal, the sentence-start imperative, an AI-domain object,
 /// or the `harnessing` gerund; every noun use passes structurally.
 #[test]
@@ -400,7 +400,7 @@ fn genuine_slop_in_prose_and_avoid_lists_still_fires() {
     );
 }
 
-/// Diagnosis pin (corpus evidence: A001 on crate names in audit tables): a
+/// Diagnosis pin (A001 on crate names in audit tables): a
 /// single-cell
 /// lexicon word — a crate NAMED `robust` or `Vibrant` — is NOT cross-cell
 /// fusion and deliberately still fires. Distinguishing a name column from a
