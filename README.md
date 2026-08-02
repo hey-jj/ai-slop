@@ -40,12 +40,11 @@ Each run takes exactly one of eight profiles, and there is no default:
 
 ## Segmentation
 
-Prose rules skip anything in code formatting. The block below stays in
-this README as a regression check of that:
+Prose rules skip anything in code formatting, so a pattern the tool
+detects can be quoted safely inside a code span or fenced block:
 
 ```text
 Co-authored-by: Claude <noreply@anthropic.com>
-Generated with ChatGPT
 utm_source=chatgpt.com
 delve seamless leverage
 ```

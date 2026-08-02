@@ -179,24 +179,6 @@ pub(crate) fn confusable_latin(ch: char) -> Option<&'static str> {
         .map(|(_, l)| *l)
 }
 
-/// True when the alphanumeric token containing the char at byte `i` (UTF-8
-/// length `ch_len`) also carries an ASCII Latin letter — the mixed-script
-/// shape that marks a homoglyph evasion. A token with no Latin letter (a
-/// genuine Cyrillic/Greek word) never folds. Scans within the given slice;
-/// a token split across markup boundaries is a known, accepted edge.
-pub(crate) fn token_mixes_latin(slice: &str, i: usize, ch_len: usize) -> bool {
-    let word = |c: &char| c.is_alphanumeric();
-    slice[..i]
-        .chars()
-        .rev()
-        .take_while(word)
-        .any(|c| c.is_ascii_alphabetic())
-        || slice[i + ch_len..]
-            .chars()
-            .take_while(word)
-            .any(|c| c.is_ascii_alphabetic())
-}
-
 /// Per-char fold-then-match decisions for ONE alphanumeric token:
 ///
 /// 1. NFKC identifier normalization: any ALPHABETIC char whose NFKC form
@@ -901,28 +883,38 @@ impl NormView {
     /// widened it across excluded bytes — without re-implementing the pipeline.
     pub fn source_span_norm_text(&self, src: &Range<usize>) -> String {
         let mut out = String::new();
-        for seg in &self.segs {
-            if seg.src.start < src.end && src.start < seg.src.end {
-                match seg.kind {
-                    // Identity: norm bytes equal source bytes, so borrow ONLY the
-                    // sub-slice the source span actually overlaps. Appending the
-                    // whole segment let a span that touched one byte of a
-                    // trigger-bearing paragraph inherit the entire paragraph's
-                    // norm text and spuriously pass the fidelity check (the
-                    // displaced-span class).
-                    SegKind::Identity => {
-                        let lo = seg.src.start.max(src.start);
-                        let hi = seg.src.end.min(src.end);
-                        let noff = seg.norm.start + (lo - seg.src.start);
-                        let nend = seg.norm.start + (hi - seg.src.start);
-                        out.push_str(&self.text[noff..nend]);
-                    }
-                    // Mapped: norm and source differ in length and a match
-                    // touching any part maps to the whole source range by design
-                    // (entities, escapes, softbreaks, owned content), so it
-                    // legitimately contributes its whole norm text.
-                    SegKind::Mapped => out.push_str(&self.text[seg.norm.clone()]),
+        // Segments are emitted in source order, so src.start and src.end are
+        // both non-decreasing across the table: binary-search the first
+        // segment that can intersect and stop at the first that starts past
+        // the span, exactly as `seg_at` resolves norm offsets. This is called
+        // once per hit, and a linear scan here made assembly O(hits x segs).
+        let first = self.segs.partition_point(|seg| seg.src.end <= src.start);
+        for seg in &self.segs[first..] {
+            if seg.src.start >= src.end {
+                break;
+            }
+            if src.start >= seg.src.end {
+                continue;
+            }
+            match seg.kind {
+                // Identity: norm bytes equal source bytes, so borrow ONLY the
+                // sub-slice the source span actually overlaps. Appending the
+                // whole segment let a span that touched one byte of a
+                // trigger-bearing paragraph inherit the entire paragraph's
+                // norm text and spuriously pass the fidelity check (the
+                // displaced-span class).
+                SegKind::Identity => {
+                    let lo = seg.src.start.max(src.start);
+                    let hi = seg.src.end.min(src.end);
+                    let noff = seg.norm.start + (lo - seg.src.start);
+                    let nend = seg.norm.start + (hi - seg.src.start);
+                    out.push_str(&self.text[noff..nend]);
                 }
+                // Mapped: norm and source differ in length and a match
+                // touching any part maps to the whole source range by design
+                // (entities, escapes, softbreaks, owned content), so it
+                // legitimately contributes its whole norm text.
+                SegKind::Mapped => out.push_str(&self.text[seg.norm.clone()]),
             }
         }
         out

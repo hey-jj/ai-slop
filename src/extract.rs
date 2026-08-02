@@ -862,9 +862,11 @@ fn inline_dest_syntactic(bytes: &[u8], delim: usize) -> Option<Range<usize>> {
     }
     let mut j = d;
     let mut depth = 0usize;
-    while j < bytes.len() {
-        match bytes[j] {
-            b'\\' => j += 2,
+    while let Some(&b) = bytes.get(j) {
+        match b {
+            // Clamp so a trailing backslash cannot step `j` past the slice
+            // end and hand back an out-of-bounds range.
+            b'\\' => j = (j + 2).min(bytes.len()),
             b'(' => {
                 depth += 1;
                 j += 1;

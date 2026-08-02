@@ -320,6 +320,16 @@ pub fn assemble(
         if stance == Stance::Off {
             continue;
         }
+        // The findings cap is enforced HERE, before the per-hit work, so an
+        // input that floods the detector stops at the limit instead of paying
+        // snippet extraction and trigger fidelity for every excess hit. Fail
+        // closed exactly as the post-loop check did.
+        if findings.len() >= config.limits.max_findings {
+            return Err(AnalysisError::Instrumentation(format!(
+                "findings exceed the {} limit",
+                config.limits.max_findings
+            )));
+        }
         let mut tier = rule.tier;
         let mut lifecycle = rule.lifecycle;
         let mut provenance = "author".to_string();
@@ -416,14 +426,6 @@ pub fn assemble(
             && a.spans[0].end == b.spans[0].end
             && a.state == b.state
     });
-
-    if findings.len() > config.limits.max_findings {
-        return Err(AnalysisError::Instrumentation(format!(
-            "{} findings exceed the {} limit",
-            findings.len(),
-            config.limits.max_findings
-        )));
-    }
 
     if adversarial {
         notes.push(

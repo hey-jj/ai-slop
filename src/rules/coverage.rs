@@ -49,14 +49,33 @@ pub fn evaluate(
             let mut i = 0usize;
             while i < slice.len() {
                 let ch = slice[i..].chars().next().unwrap_or('\u{FFFD}');
-                let l = ch.len_utf8();
-                if crate::views::confusable_latin(ch).is_some()
-                    && crate::views::token_mixes_latin(slice, i, l)
-                {
-                    hits.push(Hit::new(idx, range.start + i..range.start + i + l));
-                    break 'scan;
+                if !ch.is_alphanumeric() {
+                    i += ch.len_utf8();
+                    continue;
                 }
-                i += l;
+                // The maximal alphanumeric token starting here. The
+                // mixed-script verdict is computed ONCE per token; deciding
+                // it per confusable char re-walked the token each time and
+                // made one giant single-script confusable run O(token^2).
+                let tlen: usize = slice[i..]
+                    .chars()
+                    .take_while(|c| c.is_alphanumeric())
+                    .map(|c| c.len_utf8())
+                    .sum();
+                let token = &slice[i..i + tlen];
+                if token.chars().any(|c| c.is_ascii_alphabetic()) {
+                    // Mixed-script token: hit its first confusable, exactly
+                    // the char the per-char scan reported.
+                    if let Some((off, c)) = token
+                        .char_indices()
+                        .find(|&(_, c)| crate::views::confusable_latin(c).is_some())
+                    {
+                        let at = range.start + i + off;
+                        hits.push(Hit::new(idx, at..at + c.len_utf8()));
+                        break 'scan;
+                    }
+                }
+                i += tlen;
             }
         }
     }
