@@ -16,7 +16,9 @@ fn run_stdin(args: &[&str], stdin: &[u8]) -> (i32, String, String) {
         .stderr(Stdio::piped())
         .spawn()
         .unwrap();
-    child.stdin.as_mut().unwrap().write_all(stdin).unwrap();
+    // A child asserting a usage error may exit before draining stdin; the
+    // resulting EPIPE on this write is expected, not a harness failure.
+    let _ = child.stdin.as_mut().unwrap().write_all(stdin);
     let out = child.wait_with_output().unwrap();
     (
         out.status.code().unwrap_or(-1),
