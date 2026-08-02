@@ -438,3 +438,201 @@ fn single_cell_lexicon_word_is_a_documented_residual_not_fusion() {
         common::rule_ids(&report)
     );
 }
+
+// --- SLOP-C007 apophatic self-definition: adjudicated boundary pins ---------
+//
+// The spec's 16 positive and 16 negative boundary examples, pinned so the T1
+// suppression classifier and the T2-T4 trigger regexes survive future tuning.
+// Positives are third-person self-description; negatives are imperatives,
+// second-person directives, parenthetical interpolations, and shapes owned by
+// SLOP-C001/C003. The deny-list homograph FN and the api-docs relax behavior
+// are pinned separately below.
+
+const C007_POSITIVES: &[&str] = &[
+    "Findings judge house style, not authorship.",
+    "The report carries evidence, not verdicts.",
+    "This tool is a linter, not a detector.",
+    "It measures diction, not intent.",
+    "The digest identifies the policy, not the tarball.",
+    "Errors are surfaced, never swallowed.",
+    "The cache is an optimization, not a source of truth.",
+    "This limit is a floor, not a ceiling.",
+    "The skill gates drafts, not people.",
+    "The check enforces style, not correctness.",
+    "The goal is clarity, not coverage.",
+    "Waivers document exceptions, not permissions.",
+    "The check isn't about speed, it's about correctness.",
+    "Configuration is not a convenience but a contract.",
+    "The scanner is not a formatter. It is a gate.",
+    "Profiles describe the artifact, not the author.",
+];
+
+const C007_NEGATIVES: &[&str] = &[
+    "Use tabs, not spaces.",
+    "Never commit secrets, not even in fixtures.",
+    "Do not retry on 4xx.",
+    "You cannot call this from a signal handler, not even with a lock held.",
+    "Prefer &str, not String, in argument position.",
+    "Pass --force, not -f, to override.",
+    "Rust, not C, was chosen for the rewrite.",
+    "The tests cover ASCII but not UTF-16.",
+    "If not set, the default applies.",
+    "Whether or not the flag is present, parsing proceeds.",
+    "The parser accepts CRLF, not because it is valid, but because real files contain it.",
+    "Use exponential backoff rather than fixed sleeps.",
+    "When in doubt, use the builder, not the raw constructor.",
+    "404 Not Found is returned for missing keys.",
+    "> \"It's not a bug, it's a feature.\"",
+];
+
+#[test]
+fn c007_positive_boundaries_fire_as_experimental_candidates() {
+    for text in C007_POSITIVES {
+        let t = format!("{text}\n");
+        let report = run(&t, Profile::Readme);
+        assert_invariants(&t, &report);
+        let f = report
+            .findings
+            .iter()
+            .find(|f| f.rule_id == "SLOP-C007")
+            .unwrap_or_else(|| panic!("C007 silent on positive {text:?}"));
+        assert_eq!(f.state, "candidate", "{text:?}");
+        assert_eq!(
+            f.lifecycle, "experimental",
+            "{text:?}: experimental lifecycle reports without gating"
+        );
+    }
+}
+
+#[test]
+fn c007_negative_boundaries_stay_silent() {
+    for text in C007_NEGATIVES {
+        let t = format!("{text}\n");
+        let report = run(&t, Profile::Readme);
+        assert_invariants(&t, &report);
+        assert!(
+            !has_rule(&report, "SLOP-C007"),
+            "C007 fired on negative {text:?}: {:?}",
+            common::rule_ids(&report)
+        );
+    }
+}
+
+/// Degenerate-tail calibration: an empty or WHITESPACE-ONLY span between
+/// the keyword and the terminal is not a noun phrase, so the T1 parser must
+/// stay silent on it. The long-run variant (more whitespace than the 8-char
+/// keyword-boundary skip consumes) is the regression pin: before the
+/// content check it parsed the residual spaces as an "NP" and fired with a
+/// snippet like `, not         .`. A real NP still fires as candidate.
+#[test]
+fn c007_whitespace_only_np_is_silent() {
+    for text in [
+        "Findings, not   .\n",              // short run: consumed by the skip
+        "Findings, not            .\n",     // long run: residual ws is the "NP"
+        "Findings, never \t \t    \t  .\n", // mixed space/tab, `never` keyword
+    ] {
+        let report = run(text, Profile::Readme);
+        assert_invariants(text, &report);
+        assert!(
+            !has_rule(&report, "SLOP-C007"),
+            "C007 fired on whitespace-only NP {text:?}: {:?}",
+            common::rule_ids(&report)
+        );
+    }
+
+    // Control: the canonical specimen with a real NP still fires.
+    let t = "Findings judge house style, not authorship.\n";
+    let report = run(t, Profile::Readme);
+    let f = report
+        .findings
+        .iter()
+        .find(|f| f.rule_id == "SLOP-C007")
+        .expect("real NP must still fire");
+    assert_eq!(f.state, "candidate");
+}
+
+/// ACCEPTED FALSE NEGATIVE (KNOWN-EDGES): C007 tail matching is
+/// ASCII-whitespace-only. A non-ASCII space (here U+00A0 NBSP) between the
+/// keyword and the noun phrase fails the keyword's right-boundary check, so
+/// the tail does not fire. Accepted as attacker-unrealistic; this test
+/// characterizes the behavior, it does not endorse widening the match.
+#[test]
+fn c007_nonascii_space_tail_is_an_accepted_false_negative() {
+    let t = "Findings judge house style, not\u{00A0}authorship.\n";
+    let report = run(t, Profile::Readme);
+    assert_invariants(t, &report);
+    assert!(
+        !has_rule(&report, "SLOP-C007"),
+        "the NBSP accepted-FN pin moved: {:?}",
+        common::rule_ids(&report)
+    );
+}
+
+/// The documented deny-list false negative: `Set` is the noun/verb homograph
+/// on the imperative opener list, so this descriptive sentence is wrongly
+/// suppressed. Accepted by design — the classifier's bias is FP-safety, and
+/// every suppression doubt resolves toward silence.
+#[test]
+fn c007_denylist_homograph_is_an_accepted_false_negative() {
+    let t = "Set operations return unions, not lists.\n";
+    let report = run(t, Profile::Readme);
+    assert!(
+        !has_rule(&report, "SLOP-C007"),
+        "the deny-list FN pin moved: {:?}",
+        common::rule_ids(&report)
+    );
+}
+
+/// Subject-elided rustdoc contrast: candidate under readme, advisory-only
+/// under api-docs (`relax` drops candidate to advisory reporting), which is
+/// the profile stance that carries the legitimate operand-contrast case the
+/// mood classifier cannot reach.
+#[test]
+fn c007_api_docs_relax_drops_to_advisory() {
+    let t = "Returns a reference, not a copy.\n";
+    let readme = run(t, Profile::Readme);
+    let f = readme
+        .findings
+        .iter()
+        .find(|f| f.rule_id == "SLOP-C007")
+        .expect("candidate under readme");
+    assert_eq!(f.state, "candidate");
+    assert_eq!(f.lifecycle, "experimental");
+
+    let api = run(t, Profile::ApiDocs);
+    let f = api
+        .findings
+        .iter()
+        .find(|f| f.rule_id == "SLOP-C007")
+        .expect("still reported under api-docs");
+    assert_eq!(f.lifecycle, "advisory", "relax: candidate reports advisory");
+    assert_eq!(api.result_state, "no_findings", "advisory never gates");
+}
+
+/// Span and trigger fidelity for the T1 evaluator: the reported source slice
+/// is exactly the comma-not tail of the canonical specimen.
+#[test]
+fn c007_canonical_specimen_span_is_the_tail() {
+    let t = "Findings judge house style, not authorship.\n";
+    let report = run(t, Profile::Readme);
+    let f = report
+        .findings
+        .iter()
+        .find(|f| f.rule_id == "SLOP-C007")
+        .expect("canonical specimen fires");
+    let span = &f.spans[0];
+    assert_eq!(&t[span.start..span.end], ", not authorship.");
+    assert_eq!(common::snippet(f), ", not authorship.");
+}
+
+/// T1 sites inside code formatting are mentions, never prose: the engine's
+/// segmentation must keep the canonical specimen silent when fenced.
+#[test]
+fn c007_quoted_in_code_never_fires() {
+    let t = "Prose line.\n\n```\nFindings judge house style, not authorship.\n```\n";
+    let report = run(t, Profile::Readme);
+    assert!(
+        !has_rule(&report, "SLOP-C007"),
+        "C007 fired from inside a code fence"
+    );
+}

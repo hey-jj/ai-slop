@@ -88,6 +88,10 @@ pub const LEXICONS: &[(&str, &str)] = &[
         include_str!("../policy/words/pleasantries.txt"),
     ),
     (
+        "words/provenance-oblique.txt",
+        include_str!("../policy/words/provenance-oblique.txt"),
+    ),
+    (
         "words/provider-artifacts.txt",
         include_str!("../policy/words/provider-artifacts.txt"),
     ),

@@ -2,6 +2,7 @@
 //! ratio, and profile-contract rules. One module per rule family that needs
 //! code beyond the shared engines.
 
+pub mod contrast;
 pub mod coverage;
 pub mod density;
 pub mod emphasis;
@@ -64,6 +65,7 @@ pub const ENGINE_RULES: &[&str] = &[
     "SLOP-O003",
     "SLOP-O004",
     "SLOP-W001",
+    "SLOP-W002",
     "SLOP-J001",
     "SLOP-G001",
     "SLOP-G002",
@@ -85,6 +87,10 @@ pub fn implemented_param_keys() -> &'static [(&'static str, &'static str)] {
         ("SLOP-E001", "emphasized_words"),
         ("SLOP-E001", "followed_within"),
         ("SLOP-E001", "followed_by"),
+        ("SLOP-C007", "tail_np_max_bytes"),
+        ("SLOP-C007", "clause_window_bytes"),
+        ("SLOP-C007", "imperative_openers"),
+        ("SLOP-C007", "second_person"),
         ("SLOP-E003", "list_items_with_leading_bold_label"),
         ("SLOP-D001", "count_rules"),
         ("SLOP-D001", "threshold"),
@@ -151,6 +157,7 @@ pub fn implemented_param_keys() -> &'static [(&'static str, &'static str)] {
 pub fn implemented_rule_ids() -> Vec<&'static str> {
     let mut ids: Vec<&'static str> = ENGINE_RULES.to_vec();
     ids.extend(mechanical::HANDLED);
+    ids.extend(contrast::HANDLED);
     ids.extend(emphasis::HANDLED);
     ids.extend(density::HANDLED);
     ids.extend(structural::HANDLED);
@@ -193,8 +200,8 @@ pub fn evaluate_structural(
     config: &Config,
     hits: &mut Vec<Hit>,
 ) {
-    let _ = norm;
     mechanical::evaluate(cp, prepared, doc, config, hits);
+    contrast::evaluate(cp, prepared, norm, config, hits);
     emphasis::evaluate(cp, prepared, doc, config, hits);
     structural::evaluate(cp, prepared, doc, config, hits);
     profile_contract::evaluate(cp, prepared, doc, config, hits);
