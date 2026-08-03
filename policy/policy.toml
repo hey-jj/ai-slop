@@ -3,7 +3,7 @@
 # names. Lexicon files under words/ are canonical data referenced by rule ID.
 
 [policy]
-version = "1.1.0"
+version = "1.2.0"
 # sha256 over the canonical serialization of the whole package (sorted keys,
 # LF endings, sorted file list), computed with this field set to the empty
 # string. The build embeds the computed value in every result and snapshot.
@@ -35,6 +35,11 @@ quotation_downgrade = [
   "SLOP-A001", "SLOP-A002", "SLOP-T001", "SLOP-I001", "SLOP-I002",
   "SLOP-O003",
 ]
+# Hits inside claimed-quotation regions for the rules listed below are
+# dropped at report resolution instead of downgraded: a candidate-tier rule
+# has no lower blocking state, and a quoted idiom belongs to the quoted
+# author, not the artifact.
+quotation_suppress = ["SLOP-A005"]
 profile_names = [
   "public-bug-report", "commit-message", "changelog", "release-notes",
   "readme", "api-docs", "cargo-metadata", "internal-doc",
@@ -156,6 +161,29 @@ judge = "Would the plain word (use, help, run, tool) lose information here?"
 profiles = { default = "apply" }
 [rule.exemptions]
 utilization = ["cpu utilization", "gpu utilization", "memory utilization", "heap utilization", "disk utilization", "bandwidth utilization", "link utilization", "resource utilization", "capacity utilization", "cache utilization", "core utilization", "pool utilization", "queue utilization", "utilization rate", "utilization ratio"]
+
+[[rule]]
+id = "SLOP-A005"
+name = "metaphor-reach-phrases"
+family = "ornamental"
+tier = "candidate"
+lifecycle = "experimental"
+origin = "research"
+view = "norm"
+match = { kind = "regex-set" }
+patterns = [
+  '(?i)\btells? a(\s{1,8}[a-z]{1,20}){0,2}\s{1,8}story\b',
+  '(?i)\b(worth sitting with|should sit with)\b',
+  '(?i)\bthe invitation (is|here is) to\b',
+  '(?i)\bcanary in the coal\s{0,1}mine\b',
+  '(?i)\b(is|as|remains) (our|the|a) north star\b',
+  '(?i)\brich(er)? (tapestry|picture)\b',
+  '(?i)\bserves? as a (canary|beacon|compass)\b',
+  '(?i)\bweaves? together\b',
+]
+guard = "Multi-word metaphor-reach idiom families measured at zero hits in 21,888 words of human-authored dev prose and 5/5 ornamental precision in the AI-heavy corpus. Every pattern edge is a closed word boundary, so compass never reaches into compassion. Fires on marketing-adjacent surfaces; api-docs, internal-doc, and commit-message are off because technical senses (a rich picture in soft-systems methodology, a literal mining canary, textile software weaving) live there. Quoted occurrences are dropped entirely via quotation_suppress: a quoted author's idiom is the quotation's diction, not the artifact's. Single-token metaphors (canary, beacon, compass, tapestry alone) are deliberately absent: measured 85-93 percent term-of-art collisions, skill-only."
+judge = "Does this project actually operate the thing the metaphor names?"
+profiles = { default = "apply", api-docs = "off", internal-doc = "off", commit-message = "off" }
 
 # ---------------------------------------------------------------------------
 # Family P: provider artifacts
@@ -388,6 +416,23 @@ guard = "Offering follow-up is normal in correspondence. In a bug report, commit
 judge = "Who is the offer addressed to, and can they answer in this medium?"
 profiles = { default = "apply", internal-doc = "relax" }
 
+[[rule]]
+id = "SLOP-V004"
+name = "agent-loop-vocabulary"
+family = "assistant-voice"
+tier = "candidate"
+lifecycle = "experimental"
+origin = "harvest"
+view = "norm"
+match = { kind = "word-set", lexicon = "words/agent-loop.txt", case = "insensitive", boundary = "word" }
+patterns = [
+  '\bFlagged for\b',
+  '(?i)\ball\s{1,8}(two|three|four|five|six|seven|eight|nine|ten|\d{1,3})\s{1,8}(figures|numbers|counts|claims|totals|links)\s{1,8}(confirmed|verified|checked)\b',
+]
+guard = "The document outlives the loop that produced it. A sentence addressed to the orchestrator, the operator, or the drafting process is residue in any durable artifact; it is legitimate only inside a real chat transcript, which is quoted material. The Flagged-for pattern is case-sensitive and truncated at the preposition: it matches the construction with any addressee and can never be keyed to a name, while lowercase mid-sentence uses (a commit flagged for review) never fire. internal-doc stays apply, diverging from V002/V003: the harvested evidence was an archived internal report, and these phrases are residue on any durable surface."
+judge = "Who is this sentence addressed to, and do they exist for this document's reader?"
+profiles = { default = "apply", commit-message = "relax", api-docs = "relax" }
+
 # ---------------------------------------------------------------------------
 # Family T: filler and transitions
 # ---------------------------------------------------------------------------
@@ -608,6 +653,37 @@ patterns = [
 guard = "Trailing negation tags (a comma-not or comma-never tail closing its sentence), about-reframes, and copular not-X-but-Y self-definition. Fires on third-person description of the artifact or its output. Bare imperatives and second-person directives are suppressed by the opener deny-list and person cues and stay legitimate. Parenthetical comma-closed interpolations, rather-than forms (SLOP-C003), and adverb-marked not-just-but forms (SLOP-C001) never fire here. Passes when the rejected reading was actually asserted earlier, in the thread, or in a quoted claim."
 judge = "Rule 4 test: would a human say this sentence aloud to a peer, and was the rejected reading ever on the table?"
 profiles = { default = "apply", api-docs = "relax" }
+
+[[rule]]
+id = "SLOP-C008"
+name = "contrastive-pair"
+family = "contrast"
+tier = "candidate"
+lifecycle = "experimental"
+origin = "harvest"
+view = "norm"
+match = { kind = "regex-set" }
+patterns = [
+  '(?i)\bnot to\s{1,8}[^.!?;:\n]{1,60},\s{0,8}but to\b',
+  '(?i)\bnot (what|how|why|where|when|whether|who)\b[^.!?;:\n]{1,60},\s{0,8}but (what|how|why|where|when|whether|who)\b',
+  '(?i),\s{0,8}not\s{1,8}[^.!?;:,\n]{1,50},\s{0,8}but\s{1,8}',
+  '(?i)\b(is|are) not\b[^.!?;:\n]{1,60}\.\s{1,8}(it|this|that|they) (is|are)\b',
+]
+guard = "The not-X-but-Y pair forms the comma-tail rule cannot reach: the infinitive pair (not to X, but to Y), the wh-parallel pair (not what X, but how Y), the interpolated pair (X, not Y, but Z) that C007 excludes by its no-interior-comma constraint, and the two-sentence reframe without C002's pronoun-subject requirement. Adverb-marked not-just/only-but forms stay SLOP-C001, rather-than forms stay SLOP-C003, and comma-not tails stay SLOP-C007. One load-bearing contrast is a choice; the pair form earns a candidate report, and the density instrument SLOP-C009 carries the cadence verdict. Passes when the rejected half was actually asserted earlier, in the thread, or in a quoted claim."
+judge = "Was the rejected half ever on the table?"
+profiles = { default = "apply", api-docs = "relax" }
+
+[[rule]]
+id = "SLOP-C009"
+name = "contrast-density"
+family = "contrast"
+tier = "coverage_hint"
+lifecycle = "advisory"
+origin = "research"
+view = "norm"
+match = { kind = "ratio", params = { count_rules = ["SLOP-C001", "SLOP-C002", "SLOP-C003", "SLOP-C007", "SLOP-C008"], per_words = 1000 } }
+guard = "Reading instrument: reports the contrast-family hit rate per 1000 words on top of the individual findings, so a judge who waives single hits still sees the cluster. Advisory, never gates, and carries no threshold: the gating threshold is genre-dependent and deferred to a per-profile corpus probe; until then the hand heuristic is that roughly one load-bearing contrast per 500 words reads as a choice and more reads as cadence. C004-C006 concession and balance shapes are excluded so the figure measures negation cadence alone."
+profiles = { default = "apply" }
 
 # ---------------------------------------------------------------------------
 # Family Q: rhetorical questions
@@ -855,6 +931,23 @@ match = { kind = "ratio", params = { count_rules = ["SLOP-T002"], threshold = 3,
 guard = "Three or more block-start transition tics in one document is essay cadence. Formal proofs where each connector is logically exact pass."
 judge = "Is each connector doing logical work?"
 profiles = { default = "apply" }
+
+# ---------------------------------------------------------------------------
+# Family U: duplication
+# ---------------------------------------------------------------------------
+
+[[rule]]
+id = "SLOP-U001"
+name = "self-duplication"
+family = "duplication"
+tier = "candidate"
+lifecycle = "experimental"
+origin = "harvest"
+view = "norm"
+match = { kind = "structural", params = { shingle_words = 8, min_run_words = 10, max_reports = 20 } }
+guard = "Verbatim self-duplication within one document: an 8-word shingle seed, verified by exact token comparison and extended to the maximal shared run, emitted only at 10 words or more. Every fire is a true verbatim repeat, so the matcher cannot false-positive; the judge call is whether the repetition is deliberate (a required disclaimer, a genre refrain, legal boilerplate) or template stamping. The floor is deliberate: five-word refrains and drifting-referent near-duplicates need fact comparison and stay hand-read (see the skill). A run with a fully quoted copy is skipped — epigraphs and repeated quoted claims are quotation, not self-duplication. api-docs and changelog are off, not relaxed: rustdoc repeats Errors boilerplate per function and changelogs repeat entry stems by convention, so the base rate there is structural. The earlier copy sits at the matching text before the reported span."
+judge = "Would a reader who has already read the earlier copy learn anything from this one?"
+profiles = { default = "apply", api-docs = "off", changelog = "off" }
 
 # ---------------------------------------------------------------------------
 # Family X: structural fingerprints

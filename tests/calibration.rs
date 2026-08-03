@@ -636,3 +636,434 @@ fn c007_quoted_in_code_never_fires() {
         "C007 fired from inside a code fence"
     );
 }
+
+// --- 0.1.6 abbreviation-period fix: the R6 false-split class ----------------
+//
+// Before the fix, any `.` inside the NP scan closed the tail, so `U.S.`
+// produced the truncated false candidate `, not in the U.`, and the clause
+// walk-back treated an abbreviation period as a clause boundary, shortening
+// the clause the suppression classifier sees. `period_is_terminal` bounds
+// both: a period followed by an alphanumeric or by whitespace plus a
+// lowercase continuation is sentence-internal.
+
+fn c007_findings(report: &ai_slop::Report) -> Vec<&ai_slop::Finding> {
+    report
+        .findings
+        .iter()
+        .filter(|f| f.rule_id == "SLOP-C007")
+        .collect()
+}
+
+/// The exact R6 repro: the abbreviation-internal period plus the lowercase
+/// continuation (`U.S. but`) must not manufacture a candidate. The real tail
+/// scan then dies at the comma after `Asia`, so the document is C007-silent.
+#[test]
+fn c007_abbreviation_mid_tail_no_longer_false_fires() {
+    let t = "Adoption is concentrated, not in the U.S. but in Asia, where usage doubled.\n";
+    let report = run(t, Profile::Readme);
+    assert_invariants(t, &report);
+    assert!(
+        !has_rule(&report, "SLOP-C007"),
+        "the U.S. false split is back: {:?}",
+        common::rule_ids(&report)
+    );
+}
+
+/// The R6 acceptance case proper — NO trailing comma, so the tail parser
+/// reaches the sentence terminal and the comma variant above cannot stand in
+/// for it. A `not X but Y` locative/technical contrast is a legitimate
+/// contrast (same class as the design's `Returns a reference, not a copy.`
+/// keep-rule): the contrastive `but` continuation inside the tail is
+/// SLOP-C008's pair territory, never a C007 apophatic caveat. A C008
+/// candidate here would be adjudicable; a C007 false positive is not.
+#[test]
+fn c007_not_x_but_y_contrast_without_trailing_comma_stays_silent() {
+    let t = "Adoption is concentrated, not in the U.S. but in Asia.\n";
+    let report = run(t, Profile::Readme);
+    assert_invariants(t, &report);
+    assert!(
+        !has_rule(&report, "SLOP-C007"),
+        "C007 fired on the not-X-but-Y contrast (no trailing comma): {:?}",
+        common::rule_ids(&report)
+    );
+
+    // Controls: the bare apophatic tail still fires, and a genuine tail
+    // ENDING in the same abbreviation still fires with its full span.
+    let t = "Findings judge house style, not authorship.\n";
+    let report = run(t, Profile::Readme);
+    assert_eq!(
+        c007_findings(&report).len(),
+        1,
+        "the canonical specimen went silent"
+    );
+    let t = "The survey covers Europe, not the U.S.\n";
+    let report = run(t, Profile::Readme);
+    let f = c007_findings(&report);
+    assert_eq!(f.len(), 1, "the abbreviation-final tail went silent");
+    let span = &f[0].spans[0];
+    assert_eq!(&t[span.start..span.end], ", not the U.S.");
+}
+
+/// A genuine tail ENDING in an abbreviation fires with the full span, where
+/// it used to truncate at the abbreviation's first period (`, not the U.`).
+#[test]
+fn c007_tail_ending_in_abbreviation_fires_with_the_full_span() {
+    let t = "The survey covers Europe, not the U.S.\n";
+    let report = run(t, Profile::Readme);
+    assert_invariants(t, &report);
+    let f = c007_findings(&report);
+    assert_eq!(f.len(), 1, "genuine abbreviation tail must fire once");
+    let span = &f[0].spans[0];
+    assert_eq!(&t[span.start..span.end], ", not the U.S.");
+}
+
+/// The clause_start half of the fix, pinned so it cannot silently revert:
+/// the walk-back must cross `U.S.` and recover the WHOLE clause, whose
+/// imperative opener (`Use`) then suppresses the tail. Under the old
+/// walk-back the abbreviation period read as a clause boundary, the
+/// recovered clause was just `hosted mirror`, the opener was invisible, and
+/// this sentence false-fired — so this assertion fails if the
+/// `period_is_terminal` arm is removed from `clause_start`. The
+/// non-directive control pins that crossing the abbreviation did not also
+/// change the verdict on a clause that should fire.
+#[test]
+fn c007_clause_walkback_crosses_abbreviation() {
+    let t = "Use the U.S. hosted mirror, not a pilot.\n";
+    let report = run(t, Profile::Readme);
+    assert_invariants(t, &report);
+    assert!(
+        !has_rule(&report, "SLOP-C007"),
+        "the walk-back stopped at the abbreviation and lost the opener: {:?}",
+        common::rule_ids(&report)
+    );
+
+    let t = "The rollout targets the U.S. market, not a pilot.\n";
+    let report = run(t, Profile::Readme);
+    assert_invariants(t, &report);
+    let f = c007_findings(&report);
+    assert_eq!(f.len(), 1);
+    let span = &f[0].spans[0];
+    assert_eq!(&t[span.start..span.end], ", not a pilot.");
+}
+
+/// Guard for the fix eating the genuine end-of-text terminal: the canonical
+/// specimen still fires (its terminal period is followed by a newline).
+#[test]
+fn c007_genuine_terminal_still_fires_after_the_fix() {
+    let t = "Findings judge house style, not authorship.\n";
+    let report = run(t, Profile::Readme);
+    let f = c007_findings(&report);
+    assert_eq!(f.len(), 1, "the canonical specimen went silent");
+    assert_eq!(f[0].state, "candidate");
+}
+
+/// Mid-NP `e.g.` handled means CORRECT SPAN, not silence: both abbreviation
+/// periods read as NP content and the tail closes at the true terminal. The
+/// carrier avoids an imperative opener (the design's `Use the alias, ...`
+/// specimen is suppressed by the opener deny-list, so it cannot pin the NP
+/// behavior), and the span-fidelity assertion covers the case that used to
+/// truncate.
+#[test]
+fn c007_eg_mid_np_fires_with_the_complete_span() {
+    let t = "The docs cite the alias, not e.g. the raw path.\n";
+    let report = run(t, Profile::Readme);
+    assert_invariants(t, &report);
+    let f = c007_findings(&report);
+    assert_eq!(f.len(), 1);
+    let span = &f[0].spans[0];
+    assert_eq!(&t[span.start..span.end], ", not e.g. the raw path.");
+    assert_eq!(common::snippet(f[0]), ", not e.g. the raw path.");
+}
+
+/// ACCEPTED EDGE (KNOWN-EDGES): lowercase sentence starts. Chat-style
+/// prose that opens its next sentence lowercase reads the real terminal as
+/// a continuation. Two observable shapes, both characterized here: when the
+/// continuation reaches another terminal inside the NP budget the tail
+/// fires with an over-wide span (still genuine slop, still verified by
+/// trigger fidelity); when the continuation meets an excluded character
+/// (`,` `;` `:` newline) or exhausts `tail_np_max_bytes` first, the tail is
+/// an accepted false negative — the fail-toward-silence trade.
+#[test]
+fn c007_lowercase_next_sentence_is_an_accepted_edge() {
+    // Silent shape: the comma in the continuation kills the candidate.
+    let t = "Findings judge house style, not authorship. they never block, ever.\n";
+    let report = run(t, Profile::Readme);
+    assert_invariants(t, &report);
+    assert!(
+        !has_rule(&report, "SLOP-C007"),
+        "the lowercase-continuation accepted-FN pin moved: {:?}",
+        common::rule_ids(&report)
+    );
+
+    // Over-wide shape: the continuation ends at the next terminal, so the
+    // genuine tail fires with the extended span.
+    let t = "Findings judge house style, not authorship. they never block.\n";
+    let report = run(t, Profile::Readme);
+    let f = c007_findings(&report);
+    assert_eq!(f.len(), 1);
+    let span = &f[0].spans[0];
+    assert_eq!(
+        &t[span.start..span.end],
+        ", not authorship. they never block."
+    );
+}
+
+// --- SLOP-A005 metaphor-reach phrases ---------------------------------------
+
+/// The five adjudicated corpus-A catches, pinned as experimental candidates
+/// on a hot profile.
+#[test]
+fn a005_adjudicated_positives_fire_candidate_on_readme() {
+    for text in [
+        "The data tells a more textured story about adoption.\n",
+        "This result is worth sitting with.\n",
+        "The invitation is to rethink the pipeline.\n",
+        "The metric serves as a canary for regressions.\n",
+        "It weaves together three subsystems.\n",
+    ] {
+        let report = run(text, Profile::Readme);
+        assert_invariants(text, &report);
+        let f = report
+            .findings
+            .iter()
+            .find(|f| f.rule_id == "SLOP-A005")
+            .unwrap_or_else(|| panic!("A005 silent on {text:?}"));
+        assert_eq!(f.state, "candidate", "{text:?}");
+        assert_eq!(f.lifecycle, "experimental", "{text:?}");
+    }
+}
+
+/// The closed-boundary hazard pin (`\bcompass` reached into `compassion` in
+/// the probe's loose form) plus the no-idiom-shape control.
+#[test]
+fn a005_closed_boundaries_and_plain_prose_stay_silent() {
+    for text in [
+        "Their approach serves as a compassionate model for teams.\n",
+        "She wrote a story about the outage.\n",
+        "The mine's canary protocol is documented separately.\n",
+    ] {
+        let report = run(text, Profile::Readme);
+        assert!(
+            !has_rule(&report, "SLOP-A005"),
+            "A005 fired on negative {text:?}"
+        );
+    }
+}
+
+/// quotation_suppress: an idiom inside a claimed-quotation region is
+/// DROPPED, not downgraded — the quoted author's diction is not the
+/// artifact's. The adjacent prose control proves the rule itself is hot.
+#[test]
+fn a005_quoted_hits_are_suppressed_entirely() {
+    let t = "Prose line.\n\n> The paper weaves together two traditions of analysis.\n";
+    let report = run(t, Profile::Readme);
+    assert_invariants(t, &report);
+    assert!(
+        !has_rule(&report, "SLOP-A005"),
+        "quoted A005 hit survived suppression: {:?}",
+        common::rule_ids(&report)
+    );
+
+    let t = "It weaves together two traditions of analysis.\n";
+    let report = run(t, Profile::Readme);
+    assert!(has_rule(&report, "SLOP-A005"), "prose control went silent");
+}
+
+/// quotation_suppress across a WRAPPED blockquote: the idiom spans the
+/// softbreak between two `> ` lines, and the Break op's norm segment must
+/// carry the quoted flag or `all_quoted` breaks at the wrap and the quoted
+/// hit leaks through. The soft-wrapped PROSE control pins that the phrase
+/// still assembles and fires across an unquoted softbreak.
+#[test]
+fn a005_wrapped_blockquote_hits_are_suppressed() {
+    let t = "> The data tells a more\n> textured story.\n";
+    let report = run(t, Profile::Readme);
+    assert_invariants(t, &report);
+    assert!(
+        !has_rule(&report, "SLOP-A005"),
+        "A005 survived quotation_suppress across the blockquote wrap: {:?}",
+        common::rule_ids(&report)
+    );
+
+    let t = "The data tells a more\ntextured story.\n";
+    let report = run(t, Profile::Readme);
+    assert!(
+        has_rule(&report, "SLOP-A005"),
+        "soft-wrapped prose control went silent"
+    );
+}
+
+/// Technical-surface off-switches: api-docs and internal-doc are off, so the
+/// likeliest term-of-art surfaces never see the rule.
+#[test]
+fn a005_is_off_on_technical_surfaces() {
+    for profile in [Profile::ApiDocs, Profile::InternalDoc] {
+        let report = run("It weaves together three subsystems.\n", profile);
+        assert!(
+            !has_rule(&report, "SLOP-A005"),
+            "A005 must be off under {}",
+            profile.as_str()
+        );
+    }
+}
+
+// --- SLOP-V004 agent-loop vocabulary ----------------------------------------
+
+/// Every lexicon phrase fires in a durable-profile document, and the two
+/// construction-shaped specimens from the eval evidence fire with them.
+#[test]
+fn v004_lexicon_and_construction_positives_fire() {
+    let pkg = ai_slop::policy::load().unwrap();
+    let rule = pkg.rule_by_id("SLOP-V004").unwrap();
+    for term in &rule.terms {
+        let text = format!("The check was rerun {term} without changes.\n");
+        let report = run(&text, Profile::InternalDoc);
+        let f = report
+            .findings
+            .iter()
+            .find(|f| f.rule_id == "SLOP-V004")
+            .unwrap_or_else(|| panic!("V004 silent on lexicon term {term:?}"));
+        assert_eq!(f.state, "candidate", "{term:?}");
+    }
+    for text in [
+        "Flagged for JJ: the digest moved between runs.\n",
+        "All three figures confirmed.\n",
+        "All 12 counts verified against the ledger.\n",
+    ] {
+        let report = run(text, Profile::InternalDoc);
+        assert!(
+            report
+                .findings
+                .iter()
+                .any(|f| f.rule_id == "SLOP-V004" && f.state == "candidate"),
+            "V004 construction silent on {text:?}"
+        );
+    }
+}
+
+/// The case-sensitivity bound on the Flagged-for construction: lowercase
+/// mid-sentence process prose never fires.
+#[test]
+fn v004_lowercase_flagged_for_is_silent() {
+    let t = "The commit was flagged for review by CI.\n";
+    let report = run(t, Profile::InternalDoc);
+    assert!(
+        !has_rule(&report, "SLOP-V004"),
+        "V004 fired on lowercase flagged-for: {:?}",
+        common::rule_ids(&report)
+    );
+}
+
+/// commit-message relax: `as requested in review` is legitimate commit
+/// vocabulary, so the candidate reports advisory and never gates there.
+/// (The request-reference entries moved to this rule from SLOP-V003's
+/// lexicon so exactly one rule owns each phrase.)
+#[test]
+fn v004_commit_message_relax_reports_advisory() {
+    let text = "fix: narrow the parser\n\nRenamed the flag as requested in review.\n";
+    let mut config = ai_slop::Config::new(Profile::CommitMessage);
+    config.input_format = ai_slop::InputFormat::Commit;
+    let report = ai_slop::analyze(text.as_bytes(), &config).unwrap();
+    let f = report
+        .findings
+        .iter()
+        .find(|f| f.rule_id == "SLOP-V004")
+        .expect("V004 reports under commit-message");
+    assert_eq!(f.lifecycle, "advisory", "relax: candidate reports advisory");
+    assert!(
+        !report.findings.iter().any(|f| f.rule_id == "SLOP-V003"),
+        "V003 must no longer own the request-reference phrases"
+    );
+}
+
+/// api-docs relax: session/chat SDK documentation legitimately says
+/// `in this session`, so the hit reports advisory there and candidate on a
+/// durable internal surface.
+#[test]
+fn v004_session_phrase_relaxes_on_api_docs() {
+    let t = "Each call in this session is logged.\n";
+    let api = run(t, Profile::ApiDocs);
+    let f = api
+        .findings
+        .iter()
+        .find(|f| f.rule_id == "SLOP-V004")
+        .expect("still reported under api-docs");
+    assert_eq!(f.lifecycle, "advisory");
+
+    let internal = run(t, Profile::InternalDoc);
+    let f = internal
+        .findings
+        .iter()
+        .find(|f| f.rule_id == "SLOP-V004")
+        .expect("candidate on the durable surface");
+    assert_eq!(f.state, "candidate");
+}
+
+/// Segmentation: agent-loop phrases quoted in code formatting are mentions.
+#[test]
+fn v004_phrases_in_code_formatting_are_silent() {
+    let t = "The banned phrase list:\n\n```\nnot rerun in this turn\nFlagged for JJ\n```\n";
+    let report = run(t, Profile::InternalDoc);
+    assert!(
+        !has_rule(&report, "SLOP-V004"),
+        "V004 fired from inside a code fence"
+    );
+}
+
+// --- SLOP-C008 contrastive pair ---------------------------------------------
+
+/// The #414 escape shapes verbatim: the infinitive pair, the wh-parallel
+/// pair, the interpolated pair C007 excludes by design, and the
+/// two-sentence reframe without C002's pronoun-subject requirement.
+#[test]
+fn c008_pair_shapes_fire_as_experimental_candidates() {
+    for text in [
+        "The FRI position is not to dismiss breadth, but to require depth first.\n",
+        "The survey asks not what they know about religion, but how they value it.\n",
+        "The cache is not a source of truth. It is an optimization.\n",
+    ] {
+        let report = run(text, Profile::InternalDoc);
+        assert_invariants(text, &report);
+        let f = report
+            .findings
+            .iter()
+            .find(|f| f.rule_id == "SLOP-C008")
+            .unwrap_or_else(|| panic!("C008 silent on {text:?}"));
+        assert_eq!(f.state, "candidate", "{text:?}");
+        assert_eq!(f.lifecycle, "experimental", "{text:?}");
+    }
+}
+
+/// The directive interpolation is ADJUDICABLE, not silent: it fires
+/// candidate and the guard's judge question carries the verdict. Pinned so
+/// a future suppression heuristic cannot silently widen.
+#[test]
+fn c008_directive_interpolation_lands_candidate() {
+    let t = "Ship the fix, not the workaround, but tell support first.\n";
+    let report = run(t, Profile::InternalDoc);
+    let f = report
+        .findings
+        .iter()
+        .find(|f| f.rule_id == "SLOP-C008")
+        .expect("interpolated pair must reach the judge");
+    assert_eq!(f.state, "candidate");
+}
+
+/// Adjacent-family territory stays owned: scheduling prose without the pair
+/// shape, adverb-marked not-just forms (C001), and rather-than forms (C003)
+/// never fire C008.
+#[test]
+fn c008_stays_silent_on_adjacent_family_territory() {
+    for text in [
+        "Submit the form not later than Friday.\n",
+        "The tool is not just a linter but a gate.\n",
+        "Use exponential backoff rather than fixed sleeps.\n",
+    ] {
+        let report = run(text, Profile::InternalDoc);
+        assert!(
+            !has_rule(&report, "SLOP-C008"),
+            "C008 fired on adjacent-family text {text:?}: {:?}",
+            common::rule_ids(&report)
+        );
+    }
+}

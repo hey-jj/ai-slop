@@ -43,6 +43,11 @@ pub struct Hit {
     /// render_key aborted the whole report as an instrumentation error
     /// (exit 30) on exactly the inputs the decoded scan exists to catch.
     pub decoded: Option<String>,
+    /// Instrument figure appended to the finding message (never a trigger:
+    /// it does not exist in the source, so it must not enter the
+    /// trigger-fidelity check). Used by ratio instruments (SLOP-C009) whose
+    /// finding is a computed number over the whole document.
+    pub detail: Option<String>,
 }
 
 impl Hit {
@@ -56,6 +61,7 @@ impl Hit {
             force_hint: false,
             trigger: None,
             decoded: None,
+            detail: None,
         }
     }
 }

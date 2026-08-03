@@ -87,14 +87,66 @@ fn contains_word(hay_lower: &str, needle: &str) -> bool {
     false
 }
 
+/// Bounded terminal test for a `.` met during the NP scan or the clause
+/// walk-back. `dot_end` is the offset just past the `.` in `text`. A period
+/// followed directly by an alphanumeric character is abbreviation- or
+/// number-internal (`U.S`, `3.5`): not a terminal. A period followed by a
+/// bounded ASCII space/tab run and then a lowercase continuation is
+/// mid-sentence punctuation (`U.S. but`, `e.g. the`): not a terminal.
+/// Everything else — end of text, a line break, an uppercase/digit/quote/
+/// bracket/barrier follower, a whitespace run past the parser's 8-unit
+/// bound — is a terminal, exactly as before this test existed. The peek is
+/// O(1) and bounded, honoring the crate-wide ban on unbounded scans.
+/// Accepted false negatives (KNOWN-EDGES): chat-style prose that starts
+/// sentences lowercase reads a real terminal as a continuation and stays
+/// silent, and an abbreviation followed by a capitalized word (`Mr. Smith`)
+/// still reads as a terminal — both resolve toward silence or the
+/// pre-existing behavior, never toward a new firing surface.
+fn period_is_terminal(text: &str, dot_end: usize) -> bool {
+    let mut chars = text[dot_end..].chars();
+    let Some(first) = chars.next() else {
+        return true; // end of text
+    };
+    if first.is_alphanumeric() {
+        return false; // abbreviation- or number-internal
+    }
+    if first != ' ' && first != '\t' {
+        // Line breaks end the block; quotes, brackets, punctuation, and the
+        // U+FFFD barrier all sit on the terminal side.
+        return true;
+    }
+    // Walk at most 8 ASCII space/tab units, mirroring the tail parser's own
+    // whitespace bound.
+    let mut seen = 1usize;
+    loop {
+        match chars.next() {
+            Some(' ') | Some('\t') => {
+                seen += 1;
+                if seen > 8 {
+                    return true;
+                }
+            }
+            Some('\n') | Some('\r') => return true, // block end
+            Some(c) => return !c.is_lowercase(),
+            None => return true,
+        }
+    }
+}
+
 /// Parse the T1 tail shape starting at the comma at `comma`: up to 8
 /// whitespace characters, `not` or `never` (case-insensitive, followed by
 /// 1..=8 whitespace), then an NP of 1..=`np_max` bytes containing none of
-/// `.!?;:,\n` (nor a U+FFFD barrier) and at least one non-whitespace
+/// `!?;:,\n` (nor a U+FFFD barrier) and at least one non-whitespace
 /// character (a whitespace-only "NP" is not a noun phrase), closed by a
-/// terminal `.`, `!`, or `?`. Returns the exclusive end offset of the
-/// terminal punctuation. The no-interior-comma constraint is what keeps
-/// the parenthetical `X, not Y, verb ...` interpolation out of scope.
+/// terminal `.`, `!`, or `?`. A non-terminal `.` (abbreviation-internal or
+/// mid-sentence per `period_is_terminal`) is legal NP content. Returns the
+/// exclusive end offset of the terminal punctuation. The
+/// no-interior-comma constraint is what keeps the parenthetical
+/// `X, not Y, verb ...` interpolation out of scope, and a word-bounded
+/// `but` anywhere in the NP rejects the tail outright: a contrastive
+/// continuation (`, not in the U.S. but in Asia.`) is the not-X-but-Y pair
+/// form — SLOP-C008's territory and a legitimate contrast — never a bare
+/// apophatic caveat.
 /// Both whitespace loops match ASCII whitespace only (space/tab/LF/CR),
 /// by design: a non-ASCII space inside a contrastive tail is an
 /// attacker-unrealistic vector (see KNOWN-EDGES).
@@ -150,9 +202,28 @@ fn parse_tail(text: &str, comma: usize, np_max: usize) -> Option<usize> {
     let mut np_has_content = false;
     for c in rest[np_start..].chars() {
         match c {
+            '.' if !period_is_terminal(text, comma + 1 + k + 1) => {
+                // Abbreviation-internal or mid-sentence period (`U.S.`,
+                // `e.g.`): NP content, not a terminal.
+                np_has_content = true;
+                k += 1;
+                if k - np_start > np_max {
+                    return None;
+                }
+            }
             '.' | '!' | '?' => {
                 if !np_has_content {
                     return None; // empty or whitespace-only NP
+                }
+                // A word-bounded `but` inside the tail means the negation
+                // carries its own contrastive continuation ("not in the
+                // U.S. but in Asia"): a not-X-but-Y pair, which is a
+                // legitimate contrast shape and SLOP-C008's territory, not
+                // a bare apophatic caveat. The comma-tail rule stays
+                // silent. Bounded: the NP is at most `np_max` bytes.
+                let np_lower = rest[np_start..k].to_ascii_lowercase();
+                if contains_word(&np_lower, "but") {
+                    return None;
                 }
                 return Some(comma + 1 + k + c.len_utf8());
             }
@@ -175,7 +246,12 @@ fn parse_tail(text: &str, comma: usize, np_max: usize) -> Option<usize> {
 /// bytes to the nearest clause boundary — a line break, or terminal
 /// punctuation (`.`, `!`, `?`, plus `:` per the design) followed by
 /// whitespace — mirroring the engine's own block-start notion
-/// (`NormView::is_block_start`) as a single bounded backward pass. Offset 0
+/// (`NormView::is_block_start`) as a single bounded backward pass. A `.`
+/// additionally goes through `period_is_terminal`, so an abbreviation
+/// (`the U.S. market`) no longer truncates the recovered clause — the
+/// suppression classifier sees the whole sentence, an FP-reducing change.
+/// The `:` `!` `?` arms are untouched: a colon followed by lowercase is a
+/// legitimate clause boundary and must stay one. Offset 0
 /// counts as a boundary when it lies inside the window. `None` means the
 /// window was exhausted without a boundary; the caller fires by default.
 fn clause_start(text: &str, comma: usize, window: usize) -> Option<usize> {
@@ -187,7 +263,9 @@ fn clause_start(text: &str, comma: usize, window: usize) -> Option<usize> {
             '\n' => Some(abs + 1),
             '.' | '!' | '?' | ':' => {
                 let next = text[abs + c.len_utf8()..].chars().next();
-                if matches!(next, Some(w) if w.is_whitespace()) {
+                if matches!(next, Some(w) if w.is_whitespace())
+                    && (c != '.' || period_is_terminal(text, abs + 1))
+                {
                     Some(abs + c.len_utf8())
                 } else {
                     None

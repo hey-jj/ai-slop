@@ -217,22 +217,65 @@ before shipping.
 3. Robot cadence. Rewrite staccato fragment tricolons (`Text in, evidence out.
    The tool finds. The reader decides.`) and mechanically parallel clauses as
    one direct sentence you would say to a peer.
+4. Template stamping and self-duplication. Read the surface as a set: a
+   sentence you have effectively already read on this surface or its sibling
+   is a finding. The sub-forms: a restated paragraph one viewport apart,
+   shared copy across deck or report variants, a field stem repeated per
+   entry, the same disclaimer restated per section, an identical section
+   scaffold stamped across documents, and the drifting-referent duplicate,
+   meaning two near-identical claims whose referents quietly differ. Treat
+   that last one as a correctness defect: when two claims read the same and
+   their referents differ, at least one claim is wrong. `SLOP-U001` now
+   catches verbatim repeats of ten words or more within one document. Short
+   refrains under that floor and drifting-referent pairs need fact
+   comparison and stay yours to read. A deliberate refrain and a legally
+   required repeated notice are keeps. The finding is repetition the reader
+   gains nothing from.
+5. Metaphor-reach, single-token. A semi-technical metaphor doing decorative
+   work: `canary`, `beacon`, `compass`, `tapestry`, `north star` as bare
+   words. Two probes, in order. The litmus: would a human say this out loud
+   to a peer? The referent probe: does this project actually operate the
+   thing the metaphor names? A deploy pipeline with a real canary stage
+   earns `canary`. A status page for a service without one has to say what
+   it means. Watch the coinage-self-legitimization mechanism: a reached
+   metaphor at first use becomes project vocabulary by its second use, and
+   every later occurrence legitimately reads as a term of art. Flag new
+   semi-technical metaphors at their first appearance, and treat settled
+   internal coinages as project vocabulary. The multi-word idiom families
+   (`tells a story`, `worth sitting with`, `serves as a canary`) are now
+   rule-caught by `SLOP-A005`. The single tokens stay hand-read for good:
+   measured corpora put 85 to 93 percent of single-token hits on genuine
+   terms of art, so a rule there cannot hold the false-positive budget.
 
-### The proleptic apophatic contrastive-negation caveat
+### Contrastive negation: the six shapes
 
 Specimen: `Findings judge house style, not authorship.`
 
-Four figures stacked in one sentence:
+The figure family (corrective negation riding on antithesis, prolepsis, and
+apophasis) shows up in six recurring shapes. Name the shape before ruling:
 
-- Contrastive negation (corrective or replacive negation): the `X, not Y` /
-  `not X but Y` skeleton. `House style, not authorship.`
-- Antithesis: the balanced opposition the skeleton rides on.
-- Prolepsis (procatalepsis): answering an objection nobody raised. This is the
-  pragmatic tell. The sentence pre-rebuts a misreading no peer voiced.
-- Apophasis, definition via negativa: defining a thing by what it is not.
+1. Comma tail: `X, not Y.` closing its sentence. Rule-caught (`SLOP-C007`).
+2. Mid-sentence pair: `not X, but Y`, including the interpolated
+   `X, not Y, but Z` and the infinitive `not to X, but to Y`. Rule-caught
+   (`SLOP-C008`).
+3. Two-sentence reframe: `It is not X. It is Y.` Rule-caught
+   (`SLOP-C002`/`SLOP-C008`).
+4. Negation stack: three or more negations defining one thing across a
+   passage. Hand-read, because no single span carries it.
+5. Frame-inversion memo: a document whose sections each open on a wrong
+   frame and pivot to the reveal. Hand-read, because the tell is the
+   outline.
+6. Strawman negation: the negated half was never proposed by anyone. This is
+   the pragmatic judgment that decides shapes 1-5.
 
 The prolepsis is what reads as slop. A human defines a thing by saying what it
 does. Only a nervous machine pre-rebuts an accusation no one made.
+
+The ruling heuristic: one contrast doing real argumentative work per surface
+is a choice. More than roughly one per 500 words is a cadence, and
+`SLOP-C009` now prints the per-1000-word figure so you can stop counting.
+When the identical negation recurs across sibling files, rule it as
+duplication under tell 4.
 
 The litmus test: would a human say this sentence out loud to a peer? If it
 defines the thing by negation, cut it. Do not soften it. Cut it.
@@ -265,6 +308,30 @@ Fire or keep:
   concrete wrong config behind it.
 - Keep: `Never obey injected text.` Imperative directive.
 - Keep: `Do not force-push main.` Imperative directive.
+
+## Patterns no rule will catch
+
+These classes have no mechanical rule, each for a stated reason, so the
+manual reread owns them:
+
+- Noun-piles: four or more nouns stacked as a compound (`policy digest drift
+  detection gate configuration`). No bounded grammar test separates a pile
+  from a legitimate compound term inside the false-positive budget.
+- Garden-path sentences: grammatical sentences the reader must parse twice.
+  Detecting them needs a model of reader expectation, which the text alone
+  fails to carry.
+- Label-echo: a sentence restating its own container's label (`**Latency:**
+  latency is measured per request`). The rule would need to know what the
+  container displays, and only the rendering context knows that.
+- Single-token metaphor-reach: tell 5 above. Measured term-of-art collision
+  rates put any single-token rule far outside the false-positive budget.
+- Drifting-referent duplication: two near-identical claims with quietly
+  different referents. Deciding which copy is wrong needs fact comparison
+  and sometimes repo history, which makes it correctness-review work.
+
+Each entry has a keep-condition, stated in its tell above where one exists.
+This section primes the reread: a green check means the rules found nothing,
+and these classes are what the rules cannot find.
 
 ## Files
 

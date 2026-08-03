@@ -73,6 +73,11 @@ pub enum NormOp {
     Break {
         range: Range<usize>,
         hard: bool,
+        /// Same quote/heading flags as the Text and Barrier ops beside it:
+        /// a softbreak between two wrapped blockquote (or setext heading)
+        /// lines is inside the quote, and its norm segment must say so or
+        /// `all_quoted` breaks across the wrap.
+        flags: u8,
     },
     /// A word barrier for an excluded INLINE region whose rendered content
     /// visibly interrupts the surrounding prose — inline code (a code span
@@ -305,6 +310,31 @@ fn build_markdown(src: &str) -> Doc {
                     }
                     Tag::CodeBlock(kind) => {
                         code_depth += 1;
+                        // The rendered block visibly interrupts the prose
+                        // exactly as an inline code span does, so it gets
+                        // the same U+FFFD barrier. Exclusion alone left NO
+                        // trace in the norm view: the prose before a fence
+                        // spliced directly against the prose after it, and
+                        // a U001 run fused across DIFFERING fenced contents
+                        // into a phantom duplicate. The barrier makes the
+                        // gap a segment break for every rule. The range
+                        // covers the block's first source char (always a
+                        // char boundary) so the segment has real source
+                        // bytes for trigger-fidelity reconstruction — same
+                        // mechanism as the table leading edge above.
+                        let bend = src[range.start..]
+                            .chars()
+                            .next()
+                            .map(|c| range.start + c.len_utf8())
+                            .unwrap_or(range.start);
+                        let mut flags = 0u8;
+                        if quote_depth > 0 {
+                            flags |= F_QUOTED;
+                        }
+                        doc.ops.push(NormOp::Barrier {
+                            range: range.start..bend,
+                            flags,
+                        });
                         let (fenced, info) = match kind {
                             CodeBlockKind::Fenced(i) => (true, i.to_string()),
                             CodeBlockKind::Indented => (false, String::new()),
@@ -705,19 +735,19 @@ fn build_markdown(src: &str) -> Doc {
                 }
                 item_fresh = false;
             }
-            Event::SoftBreak => {
+            Event::SoftBreak | Event::HardBreak => {
                 if code_depth == 0 {
+                    let mut flags = 0u8;
+                    if quote_depth > 0 {
+                        flags |= F_QUOTED;
+                    }
+                    if heading_level.is_some() {
+                        flags |= F_HEADING;
+                    }
                     doc.ops.push(NormOp::Break {
                         range: range.clone(),
-                        hard: false,
-                    });
-                }
-            }
-            Event::HardBreak => {
-                if code_depth == 0 {
-                    doc.ops.push(NormOp::Break {
-                        range: range.clone(),
-                        hard: true,
+                        hard: matches!(&event, Event::HardBreak),
+                        flags,
                     });
                 }
             }

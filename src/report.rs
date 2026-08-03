@@ -320,6 +320,12 @@ pub fn assemble(
         if stance == Stance::Off {
             continue;
         }
+        // Quotation suppression: rules in this list drop their quoted hits
+        // entirely — a candidate-tier rule has no lower blocking state to
+        // downgrade to, and a quoted idiom is the quoted author's diction.
+        if hit.quoted && cp.pkg.quotation_suppress.iter().any(|id| id == &rule.id) {
+            continue;
+        }
         // The findings cap is enforced HERE, before the per-hit work, so an
         // input that floods the detector stops at the limit instead of paying
         // snippet extraction and trigger fidelity for every excess hit. Fail
@@ -407,7 +413,10 @@ pub fn assemble(
             section: section_for(doc, hit.span.start),
             provenance,
             suggestion,
-            message: rule.name.replace('-', " "),
+            message: match &hit.detail {
+                Some(d) => format!("{}: {d}", rule.name.replace('-', " ")),
+                None => rule.name.replace('-', " "),
+            },
         });
     }
 

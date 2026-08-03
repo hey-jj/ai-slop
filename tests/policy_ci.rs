@@ -47,7 +47,7 @@ fn every_rule_has_guard_tier_lifecycle_and_profiles() {
 #[test]
 fn engines_compile_once_and_load() {
     let cp = ai_slop::engine::compiled().expect("policy compiles");
-    assert_eq!(cp.pkg.rules.len(), 75);
+    assert_eq!(cp.pkg.rules.len(), 80);
 }
 
 #[test]
@@ -58,6 +58,34 @@ fn generated_snapshot_carries_the_policy_digest() {
         generated.contains(&cp.pkg.digest),
         "snapshot carries digest"
     );
+}
+
+/// Both quotation-semantics lists name real rules, and the suppress list
+/// carries the metaphor-reach rule it was introduced for. Suppression is
+/// the candidate-tier analog of the downgrade: no rule sits in both lists.
+#[test]
+fn quotation_semantics_lists_are_valid() {
+    let pkg = policy::load().unwrap();
+    for id in pkg
+        .quotation_downgrade
+        .iter()
+        .chain(pkg.quotation_suppress.iter())
+    {
+        assert!(
+            pkg.rule_by_id(id).is_some(),
+            "quotation semantics list names unknown rule {id}"
+        );
+    }
+    assert!(
+        pkg.quotation_suppress.iter().any(|id| id == "SLOP-A005"),
+        "SLOP-A005 must be quotation-suppressed"
+    );
+    for id in &pkg.quotation_suppress {
+        assert!(
+            !pkg.quotation_downgrade.contains(id),
+            "{id} is in both quotation lists"
+        );
+    }
 }
 
 #[test]

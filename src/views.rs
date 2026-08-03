@@ -832,8 +832,8 @@ pub fn build_norm(src: &str, doc: &Doc) -> NormView {
             } => {
                 b.push_mapped(range.clone(), content, *flags);
             }
-            NormOp::Break { range, hard } => {
-                b.push_mapped(range.clone(), if *hard { "\n" } else { " " }, 0);
+            NormOp::Break { range, hard, flags } => {
+                b.push_mapped(range.clone(), if *hard { "\n" } else { " " }, *flags);
                 b.out.line_starts.push(b.out.text.len());
             }
             // An excluded inline region (inline code, autolink) whose

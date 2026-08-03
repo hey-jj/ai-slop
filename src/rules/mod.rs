@@ -5,6 +5,7 @@
 pub mod contrast;
 pub mod coverage;
 pub mod density;
+pub mod duplication;
 pub mod emphasis;
 pub mod mechanical;
 pub mod profile_contract;
@@ -23,6 +24,7 @@ pub const ENGINE_RULES: &[&str] = &[
     "SLOP-A002",
     "SLOP-A003",
     "SLOP-A004",
+    "SLOP-A005",
     "SLOP-P001",
     "SLOP-P002",
     "SLOP-P003",
@@ -39,6 +41,7 @@ pub const ENGINE_RULES: &[&str] = &[
     "SLOP-V001",
     "SLOP-V002",
     "SLOP-V003",
+    "SLOP-V004",
     "SLOP-T001",
     "SLOP-T002",
     "SLOP-T003",
@@ -53,6 +56,7 @@ pub const ENGINE_RULES: &[&str] = &[
     "SLOP-C004",
     "SLOP-C005",
     "SLOP-C006",
+    "SLOP-C008",
     "SLOP-Q001",
     "SLOP-E002",
     "SLOP-R001",
@@ -102,6 +106,11 @@ pub fn implemented_param_keys() -> &'static [(&'static str, &'static str)] {
         ("SLOP-D004", "count_rules"),
         ("SLOP-D004", "threshold"),
         ("SLOP-D004", "per_document"),
+        ("SLOP-C009", "count_rules"),
+        ("SLOP-C009", "per_words"),
+        ("SLOP-U001", "shingle_words"),
+        ("SLOP-U001", "min_run_words"),
+        ("SLOP-U001", "max_reports"),
         ("SLOP-X001", "heading_set"),
         ("SLOP-X001", "min_matches"),
         ("SLOP-X002", "min_body_lines"),
@@ -158,6 +167,7 @@ pub fn implemented_rule_ids() -> Vec<&'static str> {
     let mut ids: Vec<&'static str> = ENGINE_RULES.to_vec();
     ids.extend(mechanical::HANDLED);
     ids.extend(contrast::HANDLED);
+    ids.extend(duplication::HANDLED);
     ids.extend(emphasis::HANDLED);
     ids.extend(density::HANDLED);
     ids.extend(structural::HANDLED);
@@ -202,6 +212,7 @@ pub fn evaluate_structural(
 ) {
     mechanical::evaluate(cp, prepared, doc, config, hits);
     contrast::evaluate(cp, prepared, norm, config, hits);
+    duplication::evaluate(cp, prepared, norm, config, hits);
     emphasis::evaluate(cp, prepared, doc, config, hits);
     structural::evaluate(cp, prepared, doc, config, hits);
     profile_contract::evaluate(cp, prepared, doc, config, hits);

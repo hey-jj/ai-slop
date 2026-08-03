@@ -8,12 +8,31 @@ use crate::extract::Doc;
 use crate::input::Prepared;
 use crate::Config;
 
-pub const HANDLED: &[&str] = &["SLOP-D001", "SLOP-D002", "SLOP-D003", "SLOP-D004"];
+pub const HANDLED: &[&str] = &[
+    "SLOP-D001",
+    "SLOP-D002",
+    "SLOP-D003",
+    "SLOP-D004",
+    "SLOP-C009",
+];
 
 fn count_rule_hits(cp: &CompiledPolicy, hits: &[Hit], ids: &[String]) -> u64 {
     hits.iter()
         .filter(|h| ids.iter().any(|id| &cp.pkg.rules[h.rule].id == id))
         .count() as u64
+}
+
+fn param_rule_ids(rule: &crate::policy::Rule) -> Vec<String> {
+    rule.params
+        .as_table()
+        .and_then(|t| t.get("count_rules"))
+        .and_then(|v| v.as_array())
+        .map(|a| {
+            a.iter()
+                .filter_map(|v| v.as_str().map(|s| s.to_string()))
+                .collect()
+        })
+        .unwrap_or_default()
 }
 
 pub fn evaluate(
@@ -30,17 +49,7 @@ pub fn evaluate(
             continue;
         };
         let rule = &cp.pkg.rules[idx];
-        let ids: Vec<String> = rule
-            .params
-            .as_table()
-            .and_then(|t| t.get("count_rules"))
-            .and_then(|v| v.as_array())
-            .map(|a| {
-                a.iter()
-                    .filter_map(|v| v.as_str().map(|s| s.to_string()))
-                    .collect()
-            })
-            .unwrap_or_default();
+        let ids = param_rule_ids(rule);
         let threshold = super::param_i64(rule, "threshold").unwrap_or(3) as u64;
         let count = count_rule_hits(cp, hits, &ids);
         let per_document = rule
@@ -71,6 +80,31 @@ pub fn evaluate(
             && doc.stats.bullets_with_link * 100 >= min_pct * doc.stats.bullets
         {
             hits.push(Hit::new(idx, whole.clone()));
+        }
+    }
+
+    // SLOP-C009 contrast-density: a reading instrument, not a gate. No
+    // threshold param by design — the absence is the deferred per-profile
+    // probe. Zero hits emit nothing; an all-zero line is noise.
+    if let Some(idx) = super::active(cp, config, "SLOP-C009") {
+        let rule = &cp.pkg.rules[idx];
+        let ids = param_rule_ids(rule);
+        let per_words = super::param_i64(rule, "per_words").unwrap_or(1000) as u64;
+        let count = count_rule_hits(cp, hits, &ids);
+        let words = doc.stats.word_count;
+        if count > 0 && words > 0 && per_words > 0 {
+            // One decimal place via integer math, no floats.
+            let tenths = count * per_words * 10 / words;
+            let mut hit = Hit::new(idx, whole.clone());
+            hit.detail = Some(format!(
+                "{}.{} per {} words ({} contrast hits / {} words)",
+                tenths / 10,
+                tenths % 10,
+                per_words,
+                count,
+                words
+            ));
+            hits.push(hit);
         }
     }
 

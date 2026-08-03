@@ -12,6 +12,10 @@ pub const POLICY_TOML: &str = include_str!("../policy/policy.toml");
 /// Embedded lexicon files, keyed by their package-relative path.
 pub const LEXICONS: &[(&str, &str)] = &[
     (
+        "words/agent-loop.txt",
+        include_str!("../policy/words/agent-loop.txt"),
+    ),
+    (
         "words/assistant-offers.txt",
         include_str!("../policy/words/assistant-offers.txt"),
     ),
@@ -297,6 +301,11 @@ pub struct PolicyPackage {
     pub version: String,
     pub digest: String,
     pub quotation_downgrade: Vec<String>,
+    /// Rules whose hits inside claimed-quotation regions are dropped at
+    /// report resolution rather than downgraded. A candidate-tier rule has
+    /// no lower blocking state, so suppression is the quotation semantics
+    /// that fits it.
+    pub quotation_suppress: Vec<String>,
     pub profile_names: Vec<String>,
     pub profiles: Vec<ProfileDef>,
     pub rules: Vec<Rule>,
@@ -421,6 +430,13 @@ pub fn load() -> Result<PolicyPackage, String> {
         .ok_or("[semantics].quotation_downgrade missing")?
         .iter()
         .map(|v| as_str(v, "quotation_downgrade entry"))
+        .collect::<Result<Vec<_>, _>>()?;
+    let quotation_suppress = semantics
+        .get("quotation_suppress")
+        .and_then(|v| v.as_array())
+        .ok_or("[semantics].quotation_suppress missing")?
+        .iter()
+        .map(|v| as_str(v, "quotation_suppress entry"))
         .collect::<Result<Vec<_>, _>>()?;
     let profile_names = semantics
         .get("profile_names")
@@ -674,11 +690,19 @@ pub fn load() -> Result<PolicyPackage, String> {
         }
     }
 
+    // A typo in a quotation-semantics list would silently no-op; fail loud.
+    for id in quotation_downgrade.iter().chain(quotation_suppress.iter()) {
+        if !rules.iter().any(|r| &r.id == id) {
+            return Err(format!("quotation semantics list names unknown rule {id}"));
+        }
+    }
+
     let digest = compute_digest();
     Ok(PolicyPackage {
         version,
         digest,
         quotation_downgrade,
+        quotation_suppress,
         profile_names,
         profiles,
         rules,
