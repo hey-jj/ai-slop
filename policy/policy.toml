@@ -3,7 +3,7 @@
 # names. Lexicon files under words/ are canonical data referenced by rule ID.
 
 [policy]
-version = "1.2.0"
+version = "1.3.0"
 # sha256 over the canonical serialization of the whole package (sorted keys,
 # LF endings, sorted file list), computed with this field set to the empty
 # string. The build embeds the computed value in every result and snapshot.
@@ -432,6 +432,23 @@ patterns = [
 guard = "The document outlives the loop that produced it. A sentence addressed to the orchestrator, the operator, or the drafting process is residue in any durable artifact; it is legitimate only inside a real chat transcript, which is quoted material. The Flagged-for pattern is case-sensitive and truncated at the preposition: it matches the construction with any addressee and can never be keyed to a name, while lowercase mid-sentence uses (a commit flagged for review) never fire. internal-doc stays apply, diverging from V002/V003: the harvested evidence was an archived internal report, and these phrases are residue on any durable surface."
 judge = "Who is this sentence addressed to, and do they exist for this document's reader?"
 profiles = { default = "apply", commit-message = "relax", api-docs = "relax" }
+
+[[rule]]
+id = "SLOP-V005"
+name = "ledger-stamp"
+family = "assistant-voice"
+tier = "candidate"
+lifecycle = "experimental"
+origin = "harvest"
+view = "norm"
+match = { kind = "regex-set" }
+patterns = [
+  '(?i)\b(the\s{1,8})?owner\s{1,8}rul(es|ed)\s{1,8}this\s{1,8}(on\s{1,8})?\d{4}-[01]\d-[0-3]\d\b',
+  '(?i)\b(re-?)?(ruled|measured|verified|confirmed|judged|adjudicated|resolved)\s{1,8}\d{4}-[01]\d-[0-3]\d\b',
+]
+guard = "Orchestration-ledger stamp diction: a verdict or measurement verb followed by a bare ISO date (ruled 2026-08-14, measured 2026-08-01), or the owner-verdict phrase with its date. Both arms require the date: the dateless owner phrase was cut because ordinary English produces owner rules this way and owner ruled this out, and the bare date is the tell anyway. A verb-plus-on-date form (measured on 2026-08-01) reads as prose and stays out of scope for the stamp arm. Release-date diction (released, published, deprecated since) is deliberately outside the verb set: dated release facts are changelog vocabulary. The date shape bounds month to 0x-1x and day to 0x-3x, loose on purpose: a malformed stamp is still a stamp. A date-parsing library's docs can hold verified 2026-01-01 as data, which is what the judge question is for. internal-doc is off: the stamp is the documented internal-ledger convention, and this rule exists to keep it from leaking outward."
+judge = "Is this a ledger stamp addressed to the process, or a dated fact this document's reader needs in this register?"
+profiles = { default = "apply", internal-doc = "off" }
 
 # ---------------------------------------------------------------------------
 # Family T: filler and transitions

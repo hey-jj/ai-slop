@@ -1010,6 +1010,60 @@ fn v004_phrases_in_code_formatting_are_silent() {
     );
 }
 
+// --- SLOP-V005 ledger-stamp --------------------------------------------------
+
+/// The harvested stamp shapes fire as candidates on a durable public
+/// surface: the owner-verdict phrase in every form, and each verdict verb
+/// directly followed by a bare ISO date.
+#[test]
+fn v005_ledger_stamps_fire() {
+    for text in [
+        "The owner rules this on 2026-08-18.\n",
+        "The owner ruled this 2026-08-12.\n",
+        "Ruled 2026-08-14 after the sweep.\n",
+        "The floor was measured 2026-08-01 across the boundary.\n",
+        "The digest was verified 2026-07-30.\n",
+        "The collision was resolved 2026-07-31.\n",
+        "Re-measured 2026-08-02 on the new toolchain.\n",
+    ] {
+        let report = run(text, Profile::Readme);
+        let f = report
+            .findings
+            .iter()
+            .find(|f| f.rule_id == "SLOP-V005")
+            .unwrap_or_else(|| panic!("V005 silent on {text:?}"));
+        assert_eq!(f.state, "candidate", "{text:?}");
+        assert_invariants(text, &report);
+    }
+}
+
+/// Release-date diction and the prose on-date form stay out of scope, and
+/// internal-doc is off because the stamp is the internal-ledger convention.
+#[test]
+fn v005_release_diction_prose_form_and_internal_doc_are_silent() {
+    for text in [
+        "Released 2026-08-18 with two fixes.\n",
+        "Published 2026-08-01 on the registry.\n",
+        "The floor was measured on 2026-08-01.\n",
+        "The audit resolved 2026 budget items.\n",
+        "The owner ruled this out after the inspection.\n",
+        "If the owner rules this way, we ship Friday.\n",
+        "The build was verified 2026-99-99.\n",
+    ] {
+        let report = run(text, Profile::Readme);
+        assert!(
+            !has_rule(&report, "SLOP-V005"),
+            "V005 fired on out-of-scope text {text:?}: {:?}",
+            common::rule_ids(&report)
+        );
+    }
+    let report = run("Ruled 2026-08-14 by the owner.\n", Profile::InternalDoc);
+    assert!(
+        !has_rule(&report, "SLOP-V005"),
+        "V005 must be off for internal-doc"
+    );
+}
+
 // --- SLOP-C008 contrastive pair ---------------------------------------------
 
 /// The #414 escape shapes verbatim: the infinitive pair, the wh-parallel
