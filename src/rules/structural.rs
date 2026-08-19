@@ -87,8 +87,43 @@ pub fn evaluate(
         if doc.stats.word_count <= max_words
             && doc.stats.word_count > 0
             && doc.headings.len() >= min_headings
+            && !x004_heading_set_exempt(rule, doc, config)
         {
             hits.push(Hit::new(idx, doc.headings[0].range.clone()));
         }
     }
+}
+
+/// SLOP-X004 `exempt_heading_sets`: true when the profile has an entry and
+/// the document's headings AFTER the first (the title, per SLOP-K001),
+/// lowercased, equal one listed set exactly and in order. An extra, missing,
+/// or reordered heading fails the match, so the exemption covers only the
+/// declared template.
+fn x004_heading_set_exempt(rule: &crate::policy::Rule, doc: &Doc, config: &Config) -> bool {
+    let Some(sets) = rule
+        .params
+        .as_table()
+        .and_then(|t| t.get("exempt_heading_sets"))
+        .and_then(|v| v.as_table())
+        .and_then(|t| t.get(config.profile.as_str()))
+        .and_then(|v| v.as_array())
+    else {
+        return false;
+    };
+    let got: Vec<String> = doc
+        .headings
+        .iter()
+        .skip(1)
+        .map(|h| h.text.trim().to_lowercase())
+        .collect();
+    sets.iter().any(|set| match set.as_array() {
+        Some(want) => {
+            want.len() == got.len()
+                && want
+                    .iter()
+                    .zip(&got)
+                    .all(|(w, g)| w.as_str() == Some(g.as_str()))
+        }
+        None => false,
+    })
 }

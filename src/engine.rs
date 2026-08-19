@@ -373,6 +373,58 @@ fn exempted(hay: &str, span: &Range<usize>, phrases: &[String]) -> bool {
     false
 }
 
+/// Case-SENSITIVE covering-literal check for `profile_exemptions`: true when
+/// one of `literals`, spelled exactly, contains the hit span. The caller
+/// passes the run profile's literal list, so profile scoping is already
+/// resolved. Shared by the word-set path (`accept_word_hit`) and the regex
+/// path (`scan_rx`).
+fn exempted_cs(hay: &str, span: &Range<usize>, literals: &[String]) -> bool {
+    if literals.is_empty() {
+        return false;
+    }
+    let max_len = literals.iter().map(|l| l.len()).max().unwrap_or(0);
+    let win_start =
+        crate::widen_to_char_boundaries(hay, span.start.saturating_sub(max_len)..span.start).start;
+    let win_end =
+        crate::widen_to_char_boundaries(hay, span.end..(span.end + max_len).min(hay.len())).end;
+    let window = &hay[win_start..win_end];
+    let rel_start = span.start - win_start;
+    let rel_end = span.end - win_start;
+    for lit in literals {
+        let mut at = 0usize;
+        while let Some(pos) = window[at..].find(lit.as_str()) {
+            let s = at + pos;
+            let e = s + lit.len();
+            if s <= rel_start && e >= rel_end {
+                return true;
+            }
+            at = s + 1;
+        }
+    }
+    false
+}
+
+/// SLOP-W001 hyphenated-compound suppression: the span edge touches an ASCII
+/// `-` whose far side is a word (xid_continue) character, so the matched term
+/// is one half of a compound token (`serial-port`, `port-forwarding`), not a
+/// standalone word. W001-scoped only — `-` stays a word-boundary character
+/// for every other rule.
+fn hyphen_compound_edge(hay: &str, span: &Range<usize>) -> bool {
+    let mut before = hay[..span.start].chars().rev();
+    if let (Some('-'), Some(c)) = (before.next(), before.next()) {
+        if unicode_ident::is_xid_continue(c) {
+            return true;
+        }
+    }
+    let mut after = hay[span.end..].chars();
+    if let (Some('-'), Some(c)) = (after.next(), after.next()) {
+        if unicode_ident::is_xid_continue(c) {
+            return true;
+        }
+    }
+    false
+}
+
 fn cjk_present(s: &str) -> bool {
     s.chars().any(|c| {
         let u = c as u32;
@@ -717,6 +769,13 @@ fn accept_word_hit(
     if exempted(hay, &span, &rule.exemptions) {
         return;
     }
+    if exempted_cs(hay, &span, &rule.profile_exemptions[config.profile.index()]) {
+        return;
+    }
+    // Hyphenated compounds are single tokens for the scrub list.
+    if rule.id == "SLOP-W001" && hyphen_compound_edge(hay, &span) {
+        return;
+    }
     // Deployment scrub override narrows the scrub list.
     if rule.id == "SLOP-W001" {
         if let Some(list) = &config.deployment.scrub_overrides {
@@ -955,6 +1014,10 @@ fn scan_rx(
                 }
             }
             _ => {}
+        }
+
+        if exempted_cs(hay, &span, &rule.profile_exemptions[config.profile.index()]) {
+            continue;
         }
 
         let (field, quoted) = match (ctx, norm) {

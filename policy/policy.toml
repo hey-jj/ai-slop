@@ -3,7 +3,7 @@
 # names. Lexicon files under words/ are canonical data referenced by rule ID.
 
 [policy]
-version = "1.3.0"
+version = "1.4.0"
 # sha256 over the canonical serialization of the whole package (sorted keys,
 # LF endings, sorted file list), computed with this field set to the empty
 # string. The build embeds the computed value in every result and snapshot.
@@ -619,8 +619,8 @@ lifecycle = "blocking"
 origin = "research"
 view = "norm"
 match = { kind = "regex-set" }
-patterns = ['(?im)^\s{0,8}(while|although|though)\b.{1,160},', '(?i)(^|[.!?]\s{1,8})(yes|admittedly|sure|granted|of course),?\s{1,8}.{1,140}\bbut\b', '(?i)\b(may|might|could) be (true|correct|valid),?\s{1,8}but\b']
-guard = "Passes when the conceded point is a real recorded objection or a genuine limitation of the claim. Temporal while and concurrency descriptions never fire."
+patterns = ['(?im)(^\s{0,8}|[.!?]\s{1,8})(while|although|though)\b.{1,160},', '(?i)(^|[.!?]\s{1,8})(yes|admittedly|sure|granted|of course),?\s{1,8}.{1,140}\bbut\b', '(?i)\b(may|might|could) be (true|correct|valid),?\s{1,8}but\b']
+guard = "Passes when the conceded point is a real recorded objection or a genuine limitation of the claim. The concession fires at line starts and at sentence starts inside a paragraph. Temporal while and concurrency descriptions never fire."
 judge = "Who raised the conceded point?"
 profiles = { default = "apply" }
 
@@ -747,9 +747,13 @@ origin = "research"
 view = "prose"
 match = { kind = "regex-set" }
 patterns = ['\b(DOES|DID|IS|ARE|NOT|NEVER)\b', '(?i)\((yes|no),?\s{1,8}really\)']
-guard = "RFC-style normative keywords MUST, SHOULD, MAY, SHALL and their negations are exempt, as are environment variables, constants, and quoted UI labels. All-caps insistence outside those is vocal staging."
+guard = "RFC-style normative keywords MUST, SHOULD, MAY, SHALL and their negations are exempt, as are environment variables, constants, and quoted UI labels. The exact ledger verdict token DO NOT BUILD is internal-doc vocabulary and exempt there only, spelled exactly. All-caps insistence outside those is vocal staging."
 judge = "Is the capitalized token a normative keyword or identifier, or spoken stress?"
 profiles = { default = "apply" }
+# profile_exemptions literals are case-SENSITIVE covering strings scoped to
+# the named profiles: `do NOT build` still fires, and the token stays a
+# candidate on every outbound surface.
+profile_exemptions = { internal-doc = ["DO NOT BUILD"] }
 
 [[rule]]
 id = "SLOP-E003"
@@ -1017,8 +1021,8 @@ tier = "candidate"
 lifecycle = "experimental"
 origin = "research"
 view = "prose"
-match = { kind = "ratio", params = { max_words = 300, min_headings = 4 } }
-guard = "A short document with four or more headings is presentation scaffolding. Index pages and FAQ stubs pass."
+match = { kind = "ratio", params = { max_words = 300, min_headings = 4, exempt_heading_sets = { public-bug-report = [["reproducer", "observed", "expected", "root cause"]] } } }
+guard = "A short document with four or more headings is presentation scaffolding. Index pages and FAQ stubs pass. A profile listed in exempt_heading_sets passes when the headings after the title, lowercased and in order, equal a listed set exactly. An extra or reordered heading still fires."
 judge = "Is the structure serving navigation or performance?"
 profiles = { default = "apply", internal-doc = "off" }
 
@@ -1035,7 +1039,7 @@ lifecycle = "blocking"
 origin = "harvest"
 view = "norm"
 match = { kind = "word-set", lexicon = "words/scrub.txt", case = "insensitive", boundary = "word" }
-guard = "Public-surface profiles only. Port is exempt when adjacent to a number or to serial, network, tcp, udp, listening, or bind. Terms inside code spans, crate names, and identifiers are excluded by segmentation. The list is deployment policy data."
+guard = "Public-surface profiles only. Port is exempt when adjacent to a number or to serial, network, tcp, udp, listening, or bind. A hyphenated compound is one token, so a scrub word joined to a neighbor by a hyphen (serial-port, port-forwarding) does not fire. Terms inside code spans, crate names, and identifiers are excluded by segmentation. The list is deployment policy data."
 profiles = { default = "apply", internal-doc = "off" }
 [rule.exemptions]
 port = ["port number", "serial port", "network port", "tcp port", "udp port", "listening port", "bind port", "port 0", "port 1", "port 2", "port 3", "port 4", "port 5", "port 6", "port 7", "port 8", "port 9"]

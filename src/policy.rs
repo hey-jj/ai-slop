@@ -269,6 +269,13 @@ pub struct Rule {
     pub stances: Vec<FieldStance>,
     /// Exemption collocations. Any phrase covering a match suppresses it.
     pub exemptions: Vec<String>,
+    /// Per-profile case-SENSITIVE covering literals, indexed by profile order
+    /// like `stances`. A hit is suppressed only when the run's profile lists a
+    /// literal that contains the hit span with the exact spelling. Unlike
+    /// `exemptions` (case-insensitive, profile-global), this scopes an
+    /// exemption to named profiles: the same bytes stay a finding everywhere
+    /// else, and a case variation of the literal still fires.
+    pub profile_exemptions: Vec<Vec<String>>,
 }
 
 impl Rule {
@@ -401,6 +408,45 @@ fn parse_field_stance(v: &toml::Value, what: &str) -> Result<FieldStance, String
         }
         _ => Err(format!("{what} must be a string or table")),
     }
+}
+
+/// Parse a rule's optional `profile_exemptions` table into the
+/// profile-order-indexed literal lists. Every key must name a known profile
+/// and every literal must be a non-empty string: a typo in either would
+/// silently exempt nothing, so both fail the load.
+fn parse_profile_exemptions(
+    rt: &toml::value::Table,
+    profile_names: &[String],
+    id: &str,
+) -> Result<Vec<Vec<String>>, String> {
+    let mut out = vec![Vec::new(); profile_names.len()];
+    let Some(v) = rt.get("profile_exemptions") else {
+        return Ok(out);
+    };
+    let table = v
+        .as_table()
+        .ok_or_else(|| format!("rule {id}: profile_exemptions must be a table"))?;
+    for (profile, literals) in table {
+        let idx = profile_names
+            .iter()
+            .position(|n| n == profile)
+            .ok_or_else(|| {
+                format!("rule {id}: profile_exemptions names unknown profile {profile}")
+            })?;
+        let arr = literals.as_array().ok_or_else(|| {
+            format!("rule {id}: profile_exemptions.{profile} must be an array of strings")
+        })?;
+        for lit in arr {
+            let s = as_str(lit, "profile_exemptions literal")?;
+            if s.is_empty() {
+                return Err(format!(
+                    "rule {id}: profile_exemptions.{profile} has an empty literal"
+                ));
+            }
+            out[idx].push(s);
+        }
+    }
+    Ok(out)
 }
 
 /// Parse the embedded package. Returns an error string on any structural
@@ -649,6 +695,8 @@ pub fn load() -> Result<PolicyPackage, String> {
             }
         }
 
+        let profile_exemptions = parse_profile_exemptions(rt, &profile_names, &id)?;
+
         rules.push(Rule {
             id,
             name,
@@ -671,6 +719,7 @@ pub fn load() -> Result<PolicyPackage, String> {
             judge,
             stances,
             exemptions,
+            profile_exemptions,
         });
     }
 
@@ -707,4 +756,60 @@ pub fn load() -> Result<PolicyPackage, String> {
         profiles,
         rules,
     })
+}
+
+#[cfg(test)]
+mod profile_exemption_tests {
+    use super::parse_profile_exemptions;
+
+    fn names() -> Vec<String> {
+        crate::Profile::ALL
+            .iter()
+            .map(|p| p.as_str().to_string())
+            .collect()
+    }
+
+    fn rule_table(toml_src: &str) -> toml::value::Table {
+        toml::from_str::<toml::Value>(toml_src)
+            .unwrap()
+            .as_table()
+            .unwrap()
+            .clone()
+    }
+
+    #[test]
+    fn absent_table_yields_empty_lists() {
+        let rt = rule_table(r#"id = "SLOP-TEST""#);
+        let out = parse_profile_exemptions(&rt, &names(), "SLOP-TEST").unwrap();
+        assert_eq!(out.len(), 8);
+        assert!(out.iter().all(|l| l.is_empty()));
+    }
+
+    #[test]
+    fn literals_index_by_profile_order() {
+        let rt = rule_table(
+            r#"profile_exemptions = { internal-doc = ["DO NOT BUILD"], readme = ["A", "B"] }"#,
+        );
+        let out = parse_profile_exemptions(&rt, &names(), "SLOP-TEST").unwrap();
+        let internal = crate::Profile::InternalDoc.index();
+        let readme = crate::Profile::Readme.index();
+        assert_eq!(out[internal], vec!["DO NOT BUILD".to_string()]);
+        assert_eq!(out[readme], vec!["A".to_string(), "B".to_string()]);
+        assert!(out[crate::Profile::PublicBugReport.index()].is_empty());
+    }
+
+    #[test]
+    fn unknown_profile_name_is_a_parse_error() {
+        let rt = rule_table(r#"profile_exemptions = { not-a-profile = ["X"] }"#);
+        let err = parse_profile_exemptions(&rt, &names(), "SLOP-TEST").unwrap_err();
+        assert!(err.contains("unknown profile not-a-profile"), "{err}");
+    }
+
+    #[test]
+    fn non_array_value_and_empty_literal_are_parse_errors() {
+        let rt = rule_table(r#"profile_exemptions = { readme = "X" }"#);
+        assert!(parse_profile_exemptions(&rt, &names(), "SLOP-TEST").is_err());
+        let rt = rule_table(r#"profile_exemptions = { readme = [""] }"#);
+        assert!(parse_profile_exemptions(&rt, &names(), "SLOP-TEST").is_err());
+    }
 }

@@ -119,6 +119,7 @@ pub fn implemented_param_keys() -> &'static [(&'static str, &'static str)] {
         ("SLOP-X003", "max_words"),
         ("SLOP-X004", "max_words"),
         ("SLOP-X004", "min_headings"),
+        ("SLOP-X004", "exempt_heading_sets"),
         ("SLOP-K001", "max_title_chars"),
         ("SLOP-K001", "forbid_title_words"),
         // K002: prefix/period/imperative behavior implemented in
