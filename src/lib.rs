@@ -228,6 +228,30 @@ pub fn analyze(input: &[u8], config: &Config) -> Result<Report, AnalysisError> {
         .map_err(|e| AnalysisError::Instrumentation(format!("policy load failed: {e}")))?;
     let prepared = input::prepare(input, config)?;
     let doc = extract::build_doc(&prepared, config)?;
+    // Prose formats reject raw Rust source. Gating a whole `.rs` file under a
+    // prose profile draws findings from statement punctuation, not prose (the
+    // documented misfire class), so the boundary fails closed instead. The
+    // prose/code split is the extractor's own: backtick fences, tilde fences,
+    // and 4-space indented code blocks are all code, never prose.
+    if matches!(
+        prepared.format,
+        input::FormatData::Markdown | input::FormatData::Text
+    ) {
+        let code_blocks: Vec<Range<usize>> = doc
+            .regions
+            .iter()
+            .filter(|r| r.kind == extract::RegionKind::CodeBlock)
+            .map(|r| r.range.clone())
+            .collect();
+        if let Some((rust_lines, nonblank)) = input::rust_source_shape(&prepared.text, &code_blocks)
+        {
+            return Err(AnalysisError::UnsupportedInput(format!(
+                "input reads as Rust source ({rust_lines} of {nonblank} non-blank \
+                 lines outside code blocks carry Rust signatures); \
+                 extract the rustdoc and gate the extract"
+            )));
+        }
+    }
     let norm = views::build_norm(&prepared.text, &doc);
     let mut hits = engine::scan_all(compiled, &prepared, &doc, &norm, config)?;
     rules::evaluate_structural(compiled, &prepared, &doc, &norm, config, &mut hits);

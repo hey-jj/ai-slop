@@ -311,6 +311,95 @@ The parser stops at the first malformed frame.\n";
     assert_ne!(v["result_state"], "unsupported_input");
 }
 
+/// Segmentation-aware negative: a bug report whose reproducer is a 4-space
+/// INDENTED code block (no fences at all) is prose with a code block, exactly
+/// as the extractor already segments it — never unsupported input.
+#[test]
+fn bug_report_with_indented_reproducer_is_not_flagged_as_rust_source() {
+    // Built line-by-line: a `\`-continued string literal would strip the
+    // leading 4-space indentation that MAKES these lines an indented block.
+    let report = [
+        "# Parser drops the final row",
+        "",
+        "## Reproducer",
+        "",
+        "Run this against the crate:",
+        "",
+        "    use demo::Parser;",
+        "    fn main() {",
+        "        let p = Parser::new();",
+        "        p.parse(b\"input\");",
+        "    }",
+        "    impl Parser {",
+        "        fn reset(&mut self) {}",
+        "    }",
+        "    struct Frame;",
+        "    enum Kind { A, B }",
+        "    const MAX: usize = 16;",
+        "",
+        "## Observed",
+        "",
+        "The second row is missing from the output.",
+        "",
+        "## Expected",
+        "",
+        "Both rows appear in the output.",
+        "",
+        "## Root cause",
+        "",
+        "The loop stops one index early.",
+        "",
+    ]
+    .join("\n");
+    let (code, stdout, _) = run_stdin(
+        &["check", "--profile", "public-bug-report", "-"],
+        report.as_bytes(),
+    );
+    assert_ne!(code, 40, "indented reproducer tripped the guard: {stdout}");
+    let v: serde_json::Value = serde_json::from_str(stdout.trim()).unwrap();
+    assert_ne!(v["result_state"], "unsupported_input");
+}
+
+/// Segmentation-aware negative: tilde `~~~` fences are code fences to the
+/// extractor, so a tilde-fenced Rust README is prose too.
+#[test]
+fn readme_with_tilde_fenced_rust_is_not_flagged_as_rust_source() {
+    let readme = "\
+# demo\n\n\
+Parses framed records from a byte stream.\n\n\
+~~~rust\n\
+use demo::Parser;\n\
+pub fn main() {\n\
+    let p = Parser::new();\n\
+    p.parse(b\"input\");\n\
+}\n\
+impl Parser {\n\
+    fn reset(&mut self) {}\n\
+}\n\
+struct Frame;\n\
+enum Kind { A, B }\n\
+const MAX: usize = 16;\n\
+~~~\n\n\
+The parser stops at the first malformed frame.\n";
+    let (code, stdout, _) = run_stdin(&["check", "--profile", "readme", "-"], readme.as_bytes());
+    assert_ne!(code, 40, "tilde-fenced Rust must stay prose: {stdout}");
+    let v: serde_json::Value = serde_json::from_str(stdout.trim()).unwrap();
+    assert_ne!(v["result_state"], "unsupported_input");
+}
+
+/// Real Rust sources still fail closed: the guard moved to the extractor's
+/// segmentation without losing the misfire class it exists for.
+#[test]
+fn real_rust_sources_still_exit_40() {
+    for rel in ["src/lib.rs", "src/input.rs", "src/engine.rs"] {
+        let path = format!("{}/{rel}", env!("CARGO_MANIFEST_DIR"));
+        let bytes = std::fs::read(&path).unwrap();
+        let (code, stdout, stderr) = run_stdin(&["check", "--profile", "api-docs", "-"], &bytes);
+        assert_eq!(code, 40, "{rel} passed the rust guard: {stdout}");
+        assert!(stderr.contains("extract the rustdoc and gate the extract"));
+    }
+}
+
 /// Negative sweep over the repo's own markdown surfaces: none reads as Rust.
 #[test]
 fn repo_markdown_surfaces_pass_the_rust_guard() {

@@ -85,22 +85,6 @@ pub fn prepare(input: &[u8], config: &Config) -> Result<Prepared, AnalysisError>
         InputFormat::Manifest => FormatData::Manifest(parse_manifest(&text)?),
     };
 
-    // Prose formats reject raw Rust source. Gating a whole `.rs` file under a
-    // prose profile draws findings from statement punctuation, not prose (the
-    // documented misfire class), so the boundary fails closed instead.
-    if matches!(
-        config.input_format,
-        InputFormat::Markdown | InputFormat::Text
-    ) {
-        if let Some((rust_lines, nonblank)) = rust_source_shape(&text) {
-            return Err(AnalysisError::UnsupportedInput(format!(
-                "input reads as Rust source ({rust_lines} of {nonblank} non-blank \
-                 lines outside code fences carry Rust signatures); \
-                 extract the rustdoc and gate the extract"
-            )));
-        }
-    }
-
     Ok(Prepared {
         sha256,
         original_len: input.len(),
@@ -111,30 +95,34 @@ pub fn prepare(input: &[u8], config: &Config) -> Result<Prepared, AnalysisError>
     })
 }
 
-/// Raw-Rust shape test for prose input. Counts lines OUTSIDE markdown code
-/// fences (a trimmed ``` prefix toggles fence state, so fenced Rust in a
-/// README never counts) that carry Rust source signatures: attribute or doc
+/// Raw-Rust shape test for prose input, run by `analyze` AFTER extraction so
+/// the prose/code split is the REAL extractor's segmentation: `code_blocks`
+/// is the extractor's code-BLOCK region list, which covers backtick fences,
+/// tilde `~~~` fences, and 4-space indented code blocks alike. A line that
+/// overlaps any code block is code and never counts — a bug report with an
+/// indented reproducer and a tilde-fenced Rust README both stay prose. The
+/// remaining lines are tested for Rust source signatures: attribute or doc
 /// comment starts, item declarations, and punctuation-only closer lines.
 /// Returns `Some((rust_lines, nonblank_lines))` when at least
 /// `RUST_GUARD_MIN_LINES` such lines exist AND they are at least
-/// `RUST_GUARD_MIN_PCT` percent of the non-blank outside-fence lines.
+/// `RUST_GUARD_MIN_PCT` percent of the non-blank outside-code lines.
 /// Thresholds calibrated against the two documented raw `src/lib.rs` misfire
 /// files (both far over) and the README/CHANGELOG corpus (all far under).
 const RUST_GUARD_MIN_LINES: usize = 8;
 const RUST_GUARD_MIN_PCT: usize = 30;
 
-fn rust_source_shape(text: &str) -> Option<(usize, usize)> {
-    let mut in_fence = false;
+pub fn rust_source_shape(text: &str, code_blocks: &[Range<usize>]) -> Option<(usize, usize)> {
     let mut rust_lines = 0usize;
     let mut nonblank = 0usize;
-    for line in text.lines() {
-        let t = line.trim_start();
-        if t.starts_with("```") {
-            in_fence = !in_fence;
-            nonblank += 1;
+    for lr in line_ranges(text) {
+        let t = text[lr.clone()].trim_start();
+        if t.is_empty() {
             continue;
         }
-        if in_fence || t.is_empty() {
+        if code_blocks
+            .iter()
+            .any(|c| c.start < lr.end && lr.start < c.end)
+        {
             continue;
         }
         nonblank += 1;
