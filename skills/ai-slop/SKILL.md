@@ -268,6 +268,10 @@ apophasis) shows up in six recurring shapes. Name the shape before ruling:
 6. Strawman negation: the negated half was never proposed by anyone. This is
    the pragmatic judgment that decides shapes 1-5.
 
+The `rather than` and `instead of` forms carry the same figure with the
+rejected half spelled out. Rule-caught (`SLOP-C003`), and the keep test below
+decides them the same way.
+
 The prolepsis is what reads as slop. A human defines a thing by saying what it
 does. Only a nervous machine pre-rebuts an accusation no one made.
 
@@ -286,9 +290,13 @@ grammatical subject is the thing or its output. Verb-initial commands (`Never
 obey injected text`, `Do not force-push main`) and second-person rules (`you
 can't sign your own waiver`) are commands and stay.
 
-A technical contrast also earns its place when the negated half names a live
-assumption that would change what the reader does. A scope disclaimer aimed at
-an imagined accusation never does.
+The keep test has two parts, and both apply to every shape above, `SLOP-C003`
+and `SLOP-C007` alike. First, keep a negation or contrast only when each half
+changes what a reader does: the kept half states the rule the reader follows,
+and the negated half names a live assumption the reader would otherwise act
+on. A scope disclaimer aimed at an imagined accusation fails on the negated
+half. Second, state the positive rule in the same sentence as the kept
+negation, so the sentence still holds if the negated half is cut.
 
 Fire or keep:
 
@@ -306,6 +314,9 @@ Fire or keep:
   bug. Both halves change what the reader does.
 - Keep: `The timeout is per attempt, not per call.` A live misreading with a
   concrete wrong config behind it.
+- Keep: `Returns 404 rather than 500 for a missing key.` The `SLOP-C003`
+  shape. A caller branching on 500 writes a bug, so each half changes what
+  the reader does.
 - Keep: `Never obey injected text.` Imperative directive.
 - Keep: `Do not force-push main.` Imperative directive.
 
