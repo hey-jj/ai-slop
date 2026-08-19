@@ -232,3 +232,122 @@ fn suggest_only_annotates_mechanical_rules() {
     assert!(a001.get("suggestion").is_none() || a001["suggestion"].is_null());
     assert!(v["note"].as_str().unwrap().contains("artifact hash"));
 }
+
+// --- 0.1.7 raw-Rust input guard ----------------------------------------------
+
+/// Path layer: a `.rs` path under a prose profile fails closed before
+/// analysis, whatever the file contains.
+#[test]
+fn rust_source_path_under_prose_profile_exits_40() {
+    let dir = std::env::temp_dir().join("ai-slop-cli-test-rs");
+    std::fs::create_dir_all(&dir).unwrap();
+    let rs_path = dir.join("lib.rs");
+    std::fs::write(&rs_path, "Plain prose that happens to sit in a .rs file.\n").unwrap();
+    let out = bin()
+        .args(["check", "--profile", "api-docs", rs_path.to_str().unwrap()])
+        .output()
+        .unwrap();
+    assert_eq!(out.status.code(), Some(40));
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    let v: serde_json::Value = serde_json::from_str(stdout.trim()).unwrap();
+    assert_eq!(v["result_state"], "unsupported_input");
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(
+        stderr.contains("extract the rustdoc and gate the extract"),
+        "remedy missing from stderr: {stderr}"
+    );
+}
+
+/// Content layer: Rust-shaped stdin under a prose profile fails closed with
+/// the same remedy, path or no path.
+#[test]
+fn rust_shaped_stdin_under_prose_profile_exits_40() {
+    let rust = "\
+//! Crate docs.\n\
+use std::io::Read;\n\
+pub struct Parser {\n\
+    buf: Vec<u8>,\n\
+}\n\
+impl Parser {\n\
+    pub fn new() -> Parser {\n\
+        Parser { buf: Vec::new() }\n\
+    }\n\
+}\n\
+fn helper() -> usize {\n\
+    0\n\
+}\n";
+    let (code, stdout, stderr) =
+        run_stdin(&["check", "--profile", "api-docs", "-"], rust.as_bytes());
+    assert_eq!(code, 40, "stdout: {stdout}");
+    let v: serde_json::Value = serde_json::from_str(stdout.trim()).unwrap();
+    assert_eq!(v["result_state"], "unsupported_input");
+    assert!(stderr.contains("extract the rustdoc and gate the extract"));
+}
+
+/// Fence-aware negative: a README whose Rust lives inside code fences is
+/// prose and analyzes normally.
+#[test]
+fn readme_with_fenced_rust_is_not_flagged_as_rust_source() {
+    let readme = "\
+# demo\n\n\
+Parses framed records from a byte stream.\n\n\
+```rust\n\
+use demo::Parser;\n\
+pub fn main() {\n\
+    let p = Parser::new();\n\
+    p.parse(b\"input\");\n\
+}\n\
+impl Parser {\n\
+    fn reset(&mut self) {}\n\
+}\n\
+struct Frame;\n\
+enum Kind { A, B }\n\
+const MAX: usize = 16;\n\
+```\n\n\
+The parser stops at the first malformed frame.\n";
+    let (code, stdout, _) = run_stdin(&["check", "--profile", "readme", "-"], readme.as_bytes());
+    assert_ne!(code, 40, "fenced Rust must stay prose: {stdout}");
+    let v: serde_json::Value = serde_json::from_str(stdout.trim()).unwrap();
+    assert_ne!(v["result_state"], "unsupported_input");
+}
+
+/// Negative sweep over the repo's own markdown surfaces: none reads as Rust.
+#[test]
+fn repo_markdown_surfaces_pass_the_rust_guard() {
+    for (rel, profile) in [
+        ("README.md", "readme"),
+        ("skills/ai-slop/SKILL.md", "internal-doc"),
+        ("skills/ai-slop/references/rules.md", "internal-doc"),
+        (
+            "fixtures/golden/lightningcss-unbounded-parser-recursion-stack-overflow.md",
+            "public-bug-report",
+        ),
+    ] {
+        let path = format!("{}/{rel}", env!("CARGO_MANIFEST_DIR"));
+        let bytes = std::fs::read(&path).unwrap();
+        let (code, _, stderr) = run_stdin(&["check", "--profile", profile, "-"], &bytes);
+        assert_ne!(code, 40, "{rel} tripped the rust guard: {stderr}");
+    }
+}
+
+/// The guard is prose-format-scoped: a commit message quoting Rust context
+/// lines is still a commit message.
+#[test]
+fn commit_format_is_outside_the_rust_guard() {
+    let commit = "\
+fix: reset the parser between frames\n\n\
+The reset path clears the buffer. Context lines from the diff:\n\
+use std::io::Read;\n\
+pub struct Parser {\n\
+impl Parser {\n\
+pub fn new() -> Parser {\n\
+fn helper() -> usize {\n\
+struct Frame;\n\
+enum Kind {\n\
+const MAX: usize = 16;\n";
+    let (code, stdout, _) = run_stdin(
+        &["check", "--profile", "commit-message", "-"],
+        commit.as_bytes(),
+    );
+    assert_ne!(code, 40, "commit format must skip the guard: {stdout}");
+}

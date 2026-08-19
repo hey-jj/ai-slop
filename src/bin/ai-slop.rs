@@ -232,6 +232,27 @@ fn cmd_check(mut parser: lexopt::Parser) -> Result<u8, lexopt::Error> {
         }
     }
 
+    // A `.rs` path under a prose profile is Rust source, never prose: fail
+    // closed before reading it, matching the content-layer guard in prepare.
+    if let Some(p) = &path {
+        let is_rs = p != "-"
+            && std::path::Path::new(p)
+                .extension()
+                .and_then(|e| e.to_str())
+                .is_some_and(|e| e.eq_ignore_ascii_case("rs"));
+        if is_rs
+            && matches!(
+                config.input_format,
+                InputFormat::Markdown | InputFormat::Text
+            )
+        {
+            let m = format!("{p} is a Rust source path; extract the rustdoc and gate the extract");
+            eprintln!("ai-slop: unsupported_input: {m}");
+            emit_line(&error_json("unsupported_input", &m));
+            return Ok(EXIT_UNSUPPORTED);
+        }
+    }
+
     let input = match read_input(path.as_deref()) {
         Ok(b) => b,
         Err(e) => {

@@ -85,6 +85,22 @@ pub fn prepare(input: &[u8], config: &Config) -> Result<Prepared, AnalysisError>
         InputFormat::Manifest => FormatData::Manifest(parse_manifest(&text)?),
     };
 
+    // Prose formats reject raw Rust source. Gating a whole `.rs` file under a
+    // prose profile draws findings from statement punctuation, not prose (the
+    // documented misfire class), so the boundary fails closed instead.
+    if matches!(
+        config.input_format,
+        InputFormat::Markdown | InputFormat::Text
+    ) {
+        if let Some((rust_lines, nonblank)) = rust_source_shape(&text) {
+            return Err(AnalysisError::UnsupportedInput(format!(
+                "input reads as Rust source ({rust_lines} of {nonblank} non-blank \
+                 lines outside code fences carry Rust signatures); \
+                 extract the rustdoc and gate the extract"
+            )));
+        }
+    }
+
     Ok(Prepared {
         sha256,
         original_len: input.len(),
@@ -93,6 +109,82 @@ pub fn prepare(input: &[u8], config: &Config) -> Result<Prepared, AnalysisError>
         text,
         format,
     })
+}
+
+/// Raw-Rust shape test for prose input. Counts lines OUTSIDE markdown code
+/// fences (a trimmed ``` prefix toggles fence state, so fenced Rust in a
+/// README never counts) that carry Rust source signatures: attribute or doc
+/// comment starts, item declarations, and punctuation-only closer lines.
+/// Returns `Some((rust_lines, nonblank_lines))` when at least
+/// `RUST_GUARD_MIN_LINES` such lines exist AND they are at least
+/// `RUST_GUARD_MIN_PCT` percent of the non-blank outside-fence lines.
+/// Thresholds calibrated against the two documented raw `src/lib.rs` misfire
+/// files (both far over) and the README/CHANGELOG corpus (all far under).
+const RUST_GUARD_MIN_LINES: usize = 8;
+const RUST_GUARD_MIN_PCT: usize = 30;
+
+fn rust_source_shape(text: &str) -> Option<(usize, usize)> {
+    let mut in_fence = false;
+    let mut rust_lines = 0usize;
+    let mut nonblank = 0usize;
+    for line in text.lines() {
+        let t = line.trim_start();
+        if t.starts_with("```") {
+            in_fence = !in_fence;
+            nonblank += 1;
+            continue;
+        }
+        if in_fence || t.is_empty() {
+            continue;
+        }
+        nonblank += 1;
+        if rust_shaped_line(t.trim_end()) {
+            rust_lines += 1;
+        }
+    }
+    if rust_lines >= RUST_GUARD_MIN_LINES && rust_lines * 100 >= RUST_GUARD_MIN_PCT * nonblank {
+        Some((rust_lines, nonblank))
+    } else {
+        None
+    }
+}
+
+/// One trimmed line's Rust-signature test: attributes and doc comments
+/// (`#[`, `#![`, `///`, `//!`), item declarations (`fn`, `struct`, `enum`,
+/// `impl`, `trait`, `mod`, `use`, `const`, `static`, `type`, optionally
+/// behind a `pub` opener), and punctuation-only closer lines (`}`, `});`).
+fn rust_shaped_line(t: &str) -> bool {
+    if t.starts_with("#[") || t.starts_with("#![") || t.starts_with("///") || t.starts_with("//!") {
+        return true;
+    }
+    if !t.is_empty()
+        && t.chars()
+            .all(|c| matches!(c, '{' | '}' | '(' | ')' | ';' | ','))
+    {
+        return true;
+    }
+    const ITEM_KEYWORDS: &[&str] = &[
+        "fn", "struct", "enum", "impl", "trait", "mod", "use", "const", "static", "type",
+    ];
+    let starts_with_word = |s: &str, w: &str| {
+        s.strip_prefix(w)
+            .map(|rest| {
+                rest.chars()
+                    .next()
+                    .is_none_or(|c| !c.is_alphanumeric() && c != '_')
+            })
+            .unwrap_or(false)
+    };
+    if ITEM_KEYWORDS.iter().any(|k| starts_with_word(t, k)) {
+        return true;
+    }
+    // `pub`-opened items: `pub fn`, `pub(crate) struct`, `pub use`, ...
+    if starts_with_word(t, "pub") {
+        return t
+            .split(|c: char| !c.is_alphanumeric() && c != '_')
+            .any(|tok| ITEM_KEYWORDS.contains(&tok));
+    }
+    false
 }
 
 /// Byte range of each line, excluding the line terminator.
