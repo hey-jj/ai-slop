@@ -1,7 +1,8 @@
 //! 0.1.7 harvest proposals (policy 1.4.0): the E002 internal-doc verdict-token
 //! allowlist via `profile_exemptions`, the X004 house-report-template
-//! exemption, the W001 hyphenated-compound suppression, and the C004
-//! sentence-start concession widening with its reconstruction fixture.
+//! exemption, the W001 hyphen-form technical-compound exemption literals, and
+//! the C004 sentence-boundary hardening with the mid-paragraph concession
+//! demoted to the skill's hand-read (reconstruction fixture pinned clean).
 
 mod common;
 
@@ -229,24 +230,27 @@ fn hyphen_suppression_does_not_leak_to_other_rules() {
     );
 }
 
-// --- P7: SLOP-C004 concession at sentence starts ------------------------------
+// --- P7: SLOP-C004 stays line-start; hand-read owns the mid-paragraph form ---
 
-/// The escaped shape from the harvest ledger: a "While X, Y" concession
-/// opening a sentence MID-paragraph, which the line-anchored pattern missed.
+/// The mid-paragraph "While X, Y" concession is the skill's hand-read shape,
+/// not the rule's: a 958-file corpus probe measured the widened
+/// sentence-start matcher mostly on temporal `while` and legitimate human
+/// contrasts (a negation-restricted variant kept temporal-while FPs and lost
+/// the genuine concessions), so the arm was demoted back to the 0.1.6
+/// line-start pattern.
 #[test]
-fn c004_mid_paragraph_while_concession_fires() {
+fn c004_mid_paragraph_while_concession_is_hand_read() {
     let t = "The BEL form keeps the text. While the parser recognizes BEL as a terminator, an ST-terminated sequence consumes the rest of the line.\n";
     let report = run(t, Profile::InternalDoc);
     assert_invariants(t, &report);
-    let f = report
-        .findings
-        .iter()
-        .find(|f| f.rule_id == "SLOP-C004")
-        .expect("sentence-start concession must fire");
-    assert_eq!(f.state, "candidate");
+    assert!(
+        !has_rule(&report, "SLOP-C004"),
+        "mid-paragraph concession is hand-read, not rule-caught: {:?}",
+        common::rule_ids(&report)
+    );
 }
 
-/// Line-start coverage is retained alongside the widening.
+/// Line-start coverage is the 0.1.6 behavior, preserved.
 #[test]
 fn c004_line_start_concession_still_fires() {
     let t = "While the cache warms, requests queue behind the lock.\n";
@@ -271,10 +275,38 @@ fn c004_mid_sentence_temporal_while_stays_silent() {
     );
 }
 
+/// The staged-agreement pattern keeps its sentence-boundary arm, and that
+/// boundary is now a REAL one: a list ordinal's period ("has 2. Granted")
+/// and an abbreviation's period ("e.g. granted") no longer open a match,
+/// via the non-digit requirement and SLOP-C007's own terminal test.
+#[test]
+fn c004_sentence_boundary_arm_rejects_ordinals_and_abbreviations() {
+    for t in [
+        "The list has 2. Granted, the code is shorter, but it hides the cost.\n",
+        "See the docs, e.g. granted, the flag is set, but the cache stays cold.\n",
+    ] {
+        let report = run(t, Profile::InternalDoc);
+        assert_invariants(t, &report);
+        assert!(
+            !has_rule(&report, "SLOP-C004"),
+            "fake sentence boundary opened a match: {t:?} {:?}",
+            common::rule_ids(&report)
+        );
+    }
+    let t = "It shipped early. Granted, the code is shorter, but it hides the cost.\n";
+    let report = run(t, Profile::InternalDoc);
+    assert!(
+        has_rule(&report, "SLOP-C004"),
+        "real sentence boundary lost: {:?}",
+        common::rule_ids(&report)
+    );
+}
+
 /// The reconstruction fixture (the original session sentence was reworded
-/// before filing, so this is a labeled same-shape substitute): adjudicated
-/// expectation is exactly one C004 candidate on the concession sentence, and
-/// no X004 because the report carries the house template (P2).
+/// before filing, so this is a labeled same-shape substitute): with the
+/// sentence-start arm demoted to the skill's hand-read, the machine
+/// expectation is a clean pass — the concession sentence is the hand-read's
+/// to rule, and no X004 because the report carries the house template (P2).
 #[test]
 fn c004_reconstruction_fixture_expectation() {
     let path = format!(
@@ -289,12 +321,5 @@ fn c004_reconstruction_fixture_expectation() {
         .iter()
         .map(|f| (f.rule_id.as_str(), f.state.as_str()))
         .collect();
-    assert_eq!(ids, vec![("SLOP-C004", "candidate")], "fixture drifted");
-    // The span carries the sentence boundary the widened alternation matched,
-    // then the concession clause up to its comma.
-    let span = &report.findings[0].spans[0];
-    assert!(
-        text[span.start..span.end].contains("While the parser recognizes"),
-        "C004 span moved off the concession sentence"
-    );
+    assert_eq!(ids, Vec::<(&str, &str)>::new(), "fixture drifted");
 }

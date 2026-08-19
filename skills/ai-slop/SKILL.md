@@ -247,7 +247,7 @@ before shipping.
    measured corpora put 85 to 93 percent of single-token hits on genuine
    terms of art, so a rule there cannot hold the false-positive budget.
 
-### Contrastive negation: the six shapes
+### Contrastive negation: the seven shapes
 
 Specimen: `Findings judge house style, not authorship.`
 
@@ -267,6 +267,13 @@ apophasis) shows up in six recurring shapes. Name the shape before ruling:
    outline.
 6. Strawman negation: the negated half was never proposed by anyone. This is
    the pragmatic judgment that decides shapes 1-5.
+7. Staged concession mid-paragraph: a sentence-start `While X, Y` (or
+   `Although`, `Though`) opening inside a paragraph. `SLOP-C004` catches the
+   line-start form. The mid-paragraph form stays hand-read for the same
+   budget reason as the single-token metaphors: a 958-file corpus probe put
+   most machine-caught sentence-start hits on temporal `while` and on
+   legitimate human contrasts. Read it with shape 6's question: who raised
+   the conceded point?
 
 The `rather than` and `instead of` forms carry the same figure with the
 rejected half spelled out. Rule-caught (`SLOP-C003`), and the keep test below

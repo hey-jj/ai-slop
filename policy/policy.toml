@@ -619,8 +619,8 @@ lifecycle = "blocking"
 origin = "research"
 view = "norm"
 match = { kind = "regex-set" }
-patterns = ['(?im)(^\s{0,8}|[.!?]\s{1,8})(while|although|though)\b.{1,160},', '(?i)(^|[.!?]\s{1,8})(yes|admittedly|sure|granted|of course),?\s{1,8}.{1,140}\bbut\b', '(?i)\b(may|might|could) be (true|correct|valid),?\s{1,8}but\b']
-guard = "Passes when the conceded point is a real recorded objection or a genuine limitation of the claim. The concession fires at line starts and at sentence starts inside a paragraph. Temporal while and concurrency descriptions never fire."
+patterns = ['(?im)^\s{0,8}(while|although|though)\b.{1,160},', '(?i)(^|[.!?]\s{1,8})(yes|admittedly|sure|granted|of course),?\s{1,8}.{1,140}\bbut\b', '(?i)\b(may|might|could) be (true|correct|valid),?\s{1,8}but\b']
+guard = "Passes when the conceded point is a real recorded objection or a genuine limitation of the claim. The concession fires at line starts. The mid-paragraph sentence-start form is the skill's hand-read shape, because a 958-file corpus probe measured the widened matcher mostly on temporal while and legitimate human contrasts. A sentence boundary in the staged-agreement pattern requires a non-digit before the punctuation and a real terminal period, so list ordinals and abbreviations never open a match. Temporal while and concurrency descriptions never fire."
 judge = "Who raised the conceded point?"
 profiles = { default = "apply" }
 

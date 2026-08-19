@@ -978,6 +978,32 @@ fn scan_rx(
                     }
                 }
             }
+            "SLOP-C004" => {
+                // Sentence-start arm only: that alternation's span begins
+                // with the consumed [.!?] boundary; the line-start arm never
+                // starts on punctuation.
+                let first = hay[span.clone()].chars().next();
+                if matches!(first, Some('.' | '!' | '?')) {
+                    // A digit immediately before the punctuation is a list
+                    // ordinal or a decimal ("2. While ..."), not a sentence
+                    // end.
+                    if hay[..span.start]
+                        .chars()
+                        .next_back()
+                        .is_some_and(|c| c.is_ascii_digit())
+                    {
+                        continue;
+                    }
+                    // An abbreviation or mid-sentence period ("e.g. while
+                    // ...") is not a sentence end — SLOP-C007's terminal
+                    // test, reused, decides.
+                    if first == Some('.')
+                        && !crate::rules::contrast::period_is_terminal(hay, span.start + 1)
+                    {
+                        continue;
+                    }
+                }
+            }
             "SLOP-E002" => {
                 let prefix = hay[..span.start].trim_end();
                 if prefix.ends_with("MUST")
