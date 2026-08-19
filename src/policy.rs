@@ -438,6 +438,11 @@ fn parse_profile_exemptions(
         let arr = literals.as_array().ok_or_else(|| {
             format!("rule {id}: profile_exemptions.{profile} must be an array of strings")
         })?;
+        if arr.is_empty() {
+            return Err(format!(
+                "rule {id}: profile_exemptions.{profile} is an empty array"
+            ));
+        }
         for lit in arr {
             let s = as_str(lit, "profile_exemptions literal")?;
             if s.is_empty() {
@@ -449,6 +454,63 @@ fn parse_profile_exemptions(
         }
     }
     Ok(out)
+}
+
+/// Validate a rule's optional `exempt_heading_sets` param (SLOP-X004). The
+/// runtime match keys by profile name and compares LOWERCASED document
+/// headings against the listed literals, so a typoed profile key or a
+/// non-lowercase heading literal would silently exempt nothing: both fail
+/// the load, with `profile_exemptions`' rigor.
+fn validate_exempt_heading_sets(
+    params: &toml::Value,
+    profile_names: &[String],
+    id: &str,
+) -> Result<(), String> {
+    let Some(v) = params.as_table().and_then(|t| t.get("exempt_heading_sets")) else {
+        return Ok(());
+    };
+    let table = v
+        .as_table()
+        .ok_or_else(|| format!("rule {id}: exempt_heading_sets must be a table"))?;
+    for (profile, sets) in table {
+        if !profile_names.iter().any(|n| n == profile) {
+            return Err(format!(
+                "rule {id}: exempt_heading_sets names unknown profile {profile}"
+            ));
+        }
+        let sets = sets.as_array().ok_or_else(|| {
+            format!("rule {id}: exempt_heading_sets.{profile} must be an array of heading sets")
+        })?;
+        if sets.is_empty() {
+            return Err(format!(
+                "rule {id}: exempt_heading_sets.{profile} is an empty array"
+            ));
+        }
+        for set in sets {
+            let set = set.as_array().ok_or_else(|| {
+                format!("rule {id}: exempt_heading_sets.{profile} sets must be arrays of strings")
+            })?;
+            if set.is_empty() {
+                return Err(format!(
+                    "rule {id}: exempt_heading_sets.{profile} has an empty heading set"
+                ));
+            }
+            for h in set {
+                let s = as_str(h, "exempt_heading_sets heading")?;
+                if s.is_empty() {
+                    return Err(format!(
+                        "rule {id}: exempt_heading_sets.{profile} has an empty heading literal"
+                    ));
+                }
+                if s != s.to_lowercase() {
+                    return Err(format!(
+                        "rule {id}: exempt_heading_sets.{profile} heading {s:?} must be lowercase"
+                    ));
+                }
+            }
+        }
+    }
+    Ok(())
 }
 
 /// Parse the embedded package. Returns an error string on any structural
@@ -648,6 +710,7 @@ pub fn load() -> Result<PolicyPackage, String> {
             .get("params")
             .cloned()
             .unwrap_or(toml::Value::Table(Default::default()));
+        validate_exempt_heading_sets(&params, &profile_names, &id)?;
         let mut patterns = Vec::new();
         if let Some(pats) = rt.get("patterns").and_then(|v| v.as_array()) {
             for p in pats {
@@ -813,5 +876,69 @@ mod profile_exemption_tests {
         assert!(parse_profile_exemptions(&rt, &names(), "SLOP-TEST").is_err());
         let rt = rule_table(r#"profile_exemptions = { readme = [""] }"#);
         assert!(parse_profile_exemptions(&rt, &names(), "SLOP-TEST").is_err());
+    }
+
+    /// The doc-comment contract: an empty array would silently exempt
+    /// nothing, so it fails the load like a typoed profile does.
+    #[test]
+    fn empty_exemption_array_is_a_parse_error() {
+        let rt = rule_table(r#"profile_exemptions = { internal-doc = [] }"#);
+        let err = parse_profile_exemptions(&rt, &names(), "SLOP-TEST").unwrap_err();
+        assert!(err.contains("empty array"), "{err}");
+    }
+}
+
+#[cfg(test)]
+mod exempt_heading_sets_tests {
+    use super::validate_exempt_heading_sets;
+
+    fn names() -> Vec<String> {
+        crate::Profile::ALL
+            .iter()
+            .map(|p| p.as_str().to_string())
+            .collect()
+    }
+
+    fn params(toml_src: &str) -> toml::Value {
+        toml::from_str::<toml::Value>(toml_src).unwrap()
+    }
+
+    #[test]
+    fn known_profile_with_lowercase_headings_loads() {
+        let p =
+            params(r#"exempt_heading_sets = { public-bug-report = [["reproducer", "observed"]] }"#);
+        assert!(validate_exempt_heading_sets(&p, &names(), "SLOP-TEST").is_ok());
+    }
+
+    #[test]
+    fn unknown_profile_key_is_a_load_error() {
+        let p = params(r#"exempt_heading_sets = { not-a-profile = [["reproducer"]] }"#);
+        let err = validate_exempt_heading_sets(&p, &names(), "SLOP-TEST").unwrap_err();
+        assert!(err.contains("unknown profile not-a-profile"), "{err}");
+    }
+
+    /// The runtime comparison lowercases the document side only, so an
+    /// uppercased literal would never match anything — it fails the load.
+    #[test]
+    fn non_lowercase_heading_literal_is_a_load_error() {
+        let p = params(r#"exempt_heading_sets = { readme = [["Reproducer"]] }"#);
+        let err = validate_exempt_heading_sets(&p, &names(), "SLOP-TEST").unwrap_err();
+        assert!(err.contains("must be lowercase"), "{err}");
+    }
+
+    #[test]
+    fn empty_and_malformed_sets_are_load_errors() {
+        for src in [
+            r#"exempt_heading_sets = { readme = [] }"#,
+            r#"exempt_heading_sets = { readme = [[]] }"#,
+            r#"exempt_heading_sets = { readme = [[""]] }"#,
+            r#"exempt_heading_sets = { readme = ["reproducer"] }"#,
+        ] {
+            let p = params(src);
+            assert!(
+                validate_exempt_heading_sets(&p, &names(), "SLOP-TEST").is_err(),
+                "{src} must fail the load"
+            );
+        }
     }
 }
