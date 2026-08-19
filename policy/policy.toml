@@ -1039,10 +1039,10 @@ lifecycle = "blocking"
 origin = "harvest"
 view = "norm"
 match = { kind = "word-set", lexicon = "words/scrub.txt", case = "insensitive", boundary = "word" }
-guard = "Public-surface profiles only. Port is exempt when adjacent to a number or to serial, network, tcp, udp, listening, or bind. A hyphenated compound is one token, so a scrub word joined to a neighbor by a hyphen (serial-port, port-forwarding) does not fire. Terms inside code spans, crate names, and identifiers are excluded by segmentation. The list is deployment policy data."
+guard = "Public-surface profiles only. Port is exempt when adjacent to a number or to serial, network, tcp, udp, listening, or bind, in space or hyphen spelling, and in port-forwarding. Hyphenation never suppresses the rule by itself: research-backed, audit-ready, straight-port, and upstream-first all fire; only the listed technical compounds are exempt. Terms inside code spans, crate names, and identifiers are excluded by segmentation. The list is deployment policy data."
 profiles = { default = "apply", internal-doc = "off" }
 [rule.exemptions]
-port = ["port number", "serial port", "network port", "tcp port", "udp port", "listening port", "bind port", "port 0", "port 1", "port 2", "port 3", "port 4", "port 5", "port 6", "port 7", "port 8", "port 9"]
+port = ["port number", "serial port", "network port", "tcp port", "udp port", "listening port", "bind port", "port-number", "serial-port", "network-port", "tcp-port", "udp-port", "listening-port", "bind-port", "port-forwarding", "port 0", "port 1", "port 2", "port 3", "port 4", "port 5", "port 6", "port 7", "port 8", "port 9"]
 
 [[rule]]
 id = "SLOP-W002"

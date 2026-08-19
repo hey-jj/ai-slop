@@ -160,10 +160,12 @@ fn x004_exemption_is_profile_scoped() {
     );
 }
 
-// --- P4: SLOP-W001 hyphenated compounds are single tokens --------------------
+// --- P4: SLOP-W001 hyphen forms of the technical port compounds ---------------
 
+/// The listed technical compounds are exemption literals, hyphen spelling
+/// included. Only these stay silent — hyphenation itself suppresses nothing.
 #[test]
-fn w001_hyphenated_compounds_do_not_fire() {
+fn w001_hyphenated_technical_compounds_do_not_fire() {
     for text in [
         "The serial-port adapter reconnects after a reset.\n",
         "The port-forwarding rule maps 8080 to 80.\n",
@@ -173,6 +175,27 @@ fn w001_hyphenated_compounds_do_not_fire() {
         assert!(
             !has_rule(&report, "SLOP-W001"),
             "hyphenated compound fired: {text:?} {:?}",
+            common::rule_ids(&report)
+        );
+    }
+}
+
+/// A scrub word hyphen-joined to an ornament is still the scrub word: the
+/// blocking provenance rule cannot be bypassed by hyphenation. These four
+/// gated CLEAN under the reverted blanket hyphen suppression.
+#[test]
+fn w001_hyphenated_hype_compounds_still_fire() {
+    for text in [
+        "A research-backed cleanup of the framing layer.\n",
+        "The audit-ready module ships this week.\n",
+        "A straight-port of the original decoder.\n",
+        "We take an upstream-first approach to fixes.\n",
+    ] {
+        let report = run(text, Profile::Readme);
+        assert_invariants(text, &report);
+        assert!(
+            has_rule(&report, "SLOP-W001"),
+            "hyphenated scrub word bypassed W001: {text:?} {:?}",
             common::rule_ids(&report)
         );
     }
@@ -193,8 +216,8 @@ fn w001_standalone_scrub_words_still_fire() {
     }
 }
 
-/// The suppression is W001-scoped: a hyphenated carrier of an ornamental
-/// lexicon term still fires A001, so `-` did not become a global word char.
+/// `-` is a word-boundary character everywhere: a hyphenated carrier of an
+/// ornamental lexicon term fires A001, exemption literals notwithstanding.
 #[test]
 fn hyphen_suppression_does_not_leak_to_other_rules() {
     let t = "| widget | a truly game-changer design |\n";

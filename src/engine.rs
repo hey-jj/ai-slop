@@ -404,27 +404,6 @@ fn exempted_cs(hay: &str, span: &Range<usize>, literals: &[String]) -> bool {
     false
 }
 
-/// SLOP-W001 hyphenated-compound suppression: the span edge touches an ASCII
-/// `-` whose far side is a word (xid_continue) character, so the matched term
-/// is one half of a compound token (`serial-port`, `port-forwarding`), not a
-/// standalone word. W001-scoped only — `-` stays a word-boundary character
-/// for every other rule.
-fn hyphen_compound_edge(hay: &str, span: &Range<usize>) -> bool {
-    let mut before = hay[..span.start].chars().rev();
-    if let (Some('-'), Some(c)) = (before.next(), before.next()) {
-        if unicode_ident::is_xid_continue(c) {
-            return true;
-        }
-    }
-    let mut after = hay[span.end..].chars();
-    if let (Some('-'), Some(c)) = (after.next(), after.next()) {
-        if unicode_ident::is_xid_continue(c) {
-            return true;
-        }
-    }
-    false
-}
-
 fn cjk_present(s: &str) -> bool {
     s.chars().any(|c| {
         let u = c as u32;
@@ -770,10 +749,6 @@ fn accept_word_hit(
         return;
     }
     if exempted_cs(hay, &span, &rule.profile_exemptions[config.profile.index()]) {
-        return;
-    }
-    // Hyphenated compounds are single tokens for the scrub list.
-    if rule.id == "SLOP-W001" && hyphen_compound_edge(hay, &span) {
         return;
     }
     // Deployment scrub override narrows the scrub list.
