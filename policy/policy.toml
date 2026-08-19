@@ -747,12 +747,13 @@ origin = "research"
 view = "prose"
 match = { kind = "regex-set" }
 patterns = ['\b(DOES|DID|IS|ARE|NOT|NEVER)\b', '(?i)\((yes|no),?\s{1,8}really\)']
-guard = "RFC-style normative keywords MUST, SHOULD, MAY, SHALL and their negations are exempt, as are environment variables, constants, and quoted UI labels. The exact ledger verdict token DO NOT BUILD is internal-doc vocabulary and exempt there only, spelled exactly. All-caps insistence outside those is vocal staging."
+guard = "RFC-style normative keywords MUST, SHOULD, MAY, SHALL and their negations are exempt, as are environment variables, constants, and quoted UI labels. The exact ledger verdict token DO NOT BUILD is internal-doc vocabulary and exempt there only, spelled exactly and standing alone: a verdict label ends at a line end, punctuation, or a table-cell bar, so a sentence that continues past the token, or a word the token's spelling is embedded in, still fires. All-caps insistence outside those is vocal staging."
 judge = "Is the capitalized token a normative keyword or identifier, or spoken stress?"
 profiles = { default = "apply" }
-# profile_exemptions literals are case-SENSITIVE covering strings scoped to
-# the named profiles: `do NOT build` still fires, and the token stays a
-# candidate on every outbound surface.
+# profile_exemptions literals are case-SENSITIVE, word-bounded, standalone
+# covering tokens scoped to the named profiles: `do NOT build` still fires,
+# `We DO NOT BUILD trust ...` still fires (a continuing word is prose, not a
+# label), and the token stays a candidate on every outbound surface.
 profile_exemptions = { internal-doc = ["DO NOT BUILD"] }
 
 [[rule]]

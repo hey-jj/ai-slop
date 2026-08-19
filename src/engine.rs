@@ -374,10 +374,18 @@ fn exempted(hay: &str, span: &Range<usize>, phrases: &[String]) -> bool {
 }
 
 /// Case-SENSITIVE covering-literal check for `profile_exemptions`: true when
-/// one of `literals`, spelled exactly, contains the hit span. The caller
-/// passes the run profile's literal list, so profile scoping is already
-/// resolved. Shared by the word-set path (`accept_word_hit`) and the regex
-/// path (`scan_rx`).
+/// one of `literals`, spelled exactly and standing alone as a verdict token,
+/// contains the hit span. The caller passes the run profile's literal list,
+/// so profile scoping is already resolved. Shared by the word-set path
+/// (`accept_word_hit`) and the regex path (`scan_rx`).
+///
+/// A covering literal only exempts a STANDALONE token:
+/// - its edges sit on word boundaries in `hay`, so an embedded spelling
+///   (`AVOCA[DO NOT BUILD] LIST`) never covers anything; and
+/// - it is not continued by a following word — a verdict label ends at end
+///   of text, a line break, punctuation, or a table-cell `|`, never at a
+///   continuing alphanumeric word, so `We DO NOT BUILD trust by ...` stays
+///   a finding.
 fn exempted_cs(hay: &str, span: &Range<usize>, literals: &[String]) -> bool {
     if literals.is_empty() {
         return false;
@@ -395,13 +403,40 @@ fn exempted_cs(hay: &str, span: &Range<usize>, literals: &[String]) -> bool {
         while let Some(pos) = window[at..].find(lit.as_str()) {
             let s = at + pos;
             let e = s + lit.len();
-            if s <= rel_start && e >= rel_end {
+            if s <= rel_start
+                && e >= rel_end
+                && word_bounded(hay, &(win_start + s..win_start + e))
+                && standalone_token_end(hay, win_start + e)
+            {
                 return true;
             }
             at = s + 1;
         }
     }
     false
+}
+
+/// True when the text after a covering literal reads as the END of a
+/// standalone token: end of text, a line break, punctuation, or a table-cell
+/// `|` — possibly after a short inline space run — but never an alphanumeric
+/// continuation word. The peek is bounded at 8 space/tab units, mirroring
+/// the parsers' whitespace bound; a longer run reads as layout, and layout
+/// ends a label.
+fn standalone_token_end(hay: &str, from: usize) -> bool {
+    let mut seen = 0usize;
+    for c in hay[from..].chars() {
+        match c {
+            ' ' | '\t' => {
+                seen += 1;
+                if seen > 8 {
+                    return true;
+                }
+            }
+            c if c.is_alphanumeric() => return false,
+            _ => return true,
+        }
+    }
+    true
 }
 
 fn cjk_present(s: &str) -> bool {

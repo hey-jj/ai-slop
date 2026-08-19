@@ -11,25 +11,31 @@ use common::{assert_invariants, has_rule, run};
 
 // --- P1: SLOP-E002 profile_exemptions, case-sensitive and profile-scoped ----
 
-/// The exact ledger verdict token is internal-doc vocabulary: the E002 hit on
-/// its `NOT` is suppressed there because the listed literal covers the span.
+/// The exact ledger verdict token, standing alone — its own clause end or a
+/// table cell — is internal-doc vocabulary: the E002 hit on its `NOT` is
+/// suppressed because the listed literal covers the span as a standalone
+/// token.
 #[test]
-fn e002_do_not_build_is_exempt_on_internal_doc() {
-    let t = "The verdict stands at DO NOT BUILD until the follow-up lands.\n";
-    let report = run(t, Profile::InternalDoc);
-    assert_invariants(t, &report);
-    assert!(
-        !has_rule(&report, "SLOP-E002"),
-        "the internal-doc verdict token fired: {:?}",
-        common::rule_ids(&report)
-    );
+fn e002_standalone_do_not_build_is_exempt_on_internal_doc() {
+    for t in [
+        "The verdict stands: DO NOT BUILD.\n",
+        "| Crate | Verdict |\n| --- | --- |\n| widget | DO NOT BUILD |\n",
+    ] {
+        let report = run(t, Profile::InternalDoc);
+        assert_invariants(t, &report);
+        assert!(
+            !has_rule(&report, "SLOP-E002"),
+            "the internal-doc verdict token fired: {t:?} {:?}",
+            common::rule_ids(&report)
+        );
+    }
 }
 
 /// The same bytes on an outbound surface stay a candidate: the exemption is
 /// scoped to the profiles the policy lists, never global.
 #[test]
 fn e002_do_not_build_still_fires_on_public_bug_report() {
-    let t = "The verdict stands at DO NOT BUILD until the follow-up lands.\n";
+    let t = "The verdict stands: DO NOT BUILD.\n";
     let report = run(t, Profile::PublicBugReport);
     assert_invariants(t, &report);
     let f = report
@@ -38,6 +44,35 @@ fn e002_do_not_build_still_fires_on_public_bug_report() {
         .find(|f| f.rule_id == "SLOP-E002")
         .expect("E002 must stay hot outside internal-doc");
     assert_eq!(f.state, "candidate");
+}
+
+/// A continuing word after the literal means the bytes are running prose
+/// wearing the verdict's spelling, not a verdict label: the covering literal
+/// exempts nothing and both NOTs of the sentence fire.
+#[test]
+fn e002_do_not_build_mid_sentence_still_fires_on_internal_doc() {
+    let t = "We DO NOT BUILD trust by shipping unreviewed patches.\n";
+    let report = run(t, Profile::InternalDoc);
+    assert_invariants(t, &report);
+    assert!(
+        has_rule(&report, "SLOP-E002"),
+        "mid-sentence DO NOT BUILD must stay a finding: {:?}",
+        common::rule_ids(&report)
+    );
+}
+
+/// The covering match is word-bounded: the literal spelled across a word's
+/// interior (`AVOCA[DO NOT BUILD] LIST`) covers nothing.
+#[test]
+fn e002_embedded_literal_spelling_still_fires_on_internal_doc() {
+    let t = "Add it to the AVOCADO NOT BUILD LIST today.\n";
+    let report = run(t, Profile::InternalDoc);
+    assert_invariants(t, &report);
+    assert!(
+        has_rule(&report, "SLOP-E002"),
+        "embedded literal spelling must stay a finding: {:?}",
+        common::rule_ids(&report)
+    );
 }
 
 /// The literal is case-SENSITIVE: a case variation of the token is not the

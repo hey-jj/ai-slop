@@ -271,7 +271,9 @@ pub struct Rule {
     pub exemptions: Vec<String>,
     /// Per-profile case-SENSITIVE covering literals, indexed by profile order
     /// like `stances`. A hit is suppressed only when the run's profile lists a
-    /// literal that contains the hit span with the exact spelling. Unlike
+    /// literal that contains the hit span with the exact spelling, word-
+    /// bounded and standing alone as a token (the label ends at a line end,
+    /// punctuation, or a table-cell bar — never at a continuing word). Unlike
     /// `exemptions` (case-insensitive, profile-global), this scopes an
     /// exemption to named profiles: the same bytes stay a finding everywhere
     /// else, and a case variation of the literal still fires.
