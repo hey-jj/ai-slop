@@ -1,6 +1,6 @@
 # Changelog
 
-## [0.1.7] - 2026-08-19
+## [0.1.8] - 2026-08-19
 
 ### Added
 
@@ -46,3 +46,19 @@
 ### Documentation
 
 - Policy 1.4.0. The snapshot reference is regenerated.
+
+## [0.1.7] - 2026-08-18
+
+### Added
+
+- SLOP-V005 ledger-stamp: a candidate rule for orchestration-ledger stamp
+  diction, meaning a verdict or measurement verb directly followed by a
+  bare ISO date, and the owner-verdict phrase with or without its date.
+  The prose form with a preposition and release-date diction stay out of
+  scope. The rule is off on the internal-doc profile, where the stamp is
+  the documented ledger convention. It exists to keep the stamp from
+  leaking outward.
+
+### Documentation
+
+- Policy 1.3.0. The snapshot reference is regenerated.
