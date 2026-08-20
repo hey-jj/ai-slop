@@ -100,22 +100,38 @@ pub fn prepare(input: &[u8], config: &Config) -> Result<Prepared, AnalysisError>
 /// is the extractor's code-BLOCK region list, which covers backtick fences,
 /// tilde `~~~` fences, and 4-space indented code blocks alike. A line that
 /// overlaps any code block is code and never counts — a bug report with an
-/// indented reproducer and a tilde-fenced Rust README both stay prose. The
-/// remaining lines are tested for Rust source signatures: attribute or doc
-/// comment starts, item declarations, and punctuation-only closer lines.
+/// indented reproducer and a tilde-fenced Rust README both stay prose.
+///
+/// Scope is narrow on purpose. The test reads Rust shape, and nothing else.
+/// Source in another language reaches the rules and produces findings a
+/// reader discounts, which buys a guard that stays off prose. The guard
+/// catches a mistake and is not a security boundary: a writer who prefixes
+/// every line with a comment marker gets past it, which is recorded rather
+/// than closed.
+///
 /// Returns `Some((rust_lines, nonblank_lines))` when at least
-/// `RUST_GUARD_MIN_LINES` such lines exist AND they are at least
+/// `RUST_GUARD_MIN_LINES` lines carry Rust structure AND they are at least
 /// `RUST_GUARD_MIN_PCT` percent of the non-blank outside-code lines.
-/// Thresholds calibrated against the two documented raw `src/lib.rs` misfire
-/// files (both far over) and the README/CHANGELOG corpus (all far under).
 const RUST_GUARD_MIN_LINES: usize = 8;
-const RUST_GUARD_MIN_PCT: usize = 30;
+const RUST_GUARD_MIN_PCT: usize = 35;
 
 pub fn rust_source_shape(text: &str, code_blocks: &[Range<usize>]) -> Option<(usize, usize)> {
+    let (rust_lines, nonblank) = rust_line_counts(text, code_blocks);
+    if rust_lines >= RUST_GUARD_MIN_LINES && rust_lines * 100 >= RUST_GUARD_MIN_PCT * nonblank {
+        Some((rust_lines, nonblank))
+    } else {
+        None
+    }
+}
+
+/// The raw counts behind `rust_source_shape`: lines carrying Rust structure,
+/// and non-blank lines outside code blocks. Public so a measurement can score
+/// a document without asking whether it crosses the thresholds.
+pub fn rust_line_counts(text: &str, code_blocks: &[Range<usize>]) -> (usize, usize) {
     let mut rust_lines = 0usize;
     let mut nonblank = 0usize;
     for lr in line_ranges(text) {
-        let t = text[lr.clone()].trim_start();
+        let t = text[lr.clone()].trim();
         if t.is_empty() {
             continue;
         }
@@ -126,53 +142,121 @@ pub fn rust_source_shape(text: &str, code_blocks: &[Range<usize>]) -> Option<(us
             continue;
         }
         nonblank += 1;
-        if rust_shaped_line(t.trim_end()) {
+        if rust_shaped_line(t) {
             rust_lines += 1;
         }
     }
-    if rust_lines >= RUST_GUARD_MIN_LINES && rust_lines * 100 >= RUST_GUARD_MIN_PCT * nonblank {
-        Some((rust_lines, nonblank))
-    } else {
-        None
-    }
+    (rust_lines, nonblank)
 }
 
-/// One trimmed line's Rust-signature test: attributes and doc comments
-/// (`#[`, `#![`, `///`, `//!`), item declarations (`fn`, `struct`, `enum`,
-/// `impl`, `trait`, `mod`, `use`, `const`, `static`, `type`, optionally
-/// behind a `pub` opener), and punctuation-only closer lines (`}`, `});`).
+/// One trimmed line's Rust-shape test, in two arms.
+///
+/// Arm 1 needs no terminator, because the shape carries itself: an attribute
+/// opener, a comment opener of any depth, or a line made only of structural
+/// punctuation. In markdown that shape lives inside a fence, which
+/// segmentation already excludes, so counting plain `//` costs no prose and
+/// closes most of the comment-prefix evasion on the way past.
+///
+/// Arm 2 needs both halves. The line ends on a code terminator AND either
+/// opens on an item or binding keyword, optionally behind a visibility or
+/// modifier word, or carries a path, arrow, or fat-arrow token, or has the
+/// field-line shape. Requiring both halves is what keeps prose out: a
+/// sentence opening on `use` or `type` ends on a period, and a sentence
+/// ending on a semicolon opens on neither a keyword nor a path.
 fn rust_shaped_line(t: &str) -> bool {
-    if t.starts_with("#[") || t.starts_with("#![") || t.starts_with("///") || t.starts_with("//!") {
+    // Arm 1.
+    if t.starts_with("#[") || t.starts_with("#![") || t.starts_with("//") {
         return true;
     }
-    if !t.is_empty()
-        && t.chars()
-            .all(|c| matches!(c, '{' | '}' | '(' | ')' | ';' | ','))
+    if t.chars()
+        .all(|c| matches!(c, '{' | '}' | '(' | ')' | '[' | ']' | ';' | ','))
     {
         return true;
     }
-    const ITEM_KEYWORDS: &[&str] = &[
-        "fn", "struct", "enum", "impl", "trait", "mod", "use", "const", "static", "type",
+
+    // Arm 2, first half: a code terminator at the line end.
+    if !t.ends_with(['{', '}', ';', '(', ')', ',', ']']) {
+        return false;
+    }
+    // Arm 2, second half: a keyword opener, a code token, or a field line.
+    const KEYWORDS: &[&str] = &[
+        "fn", "struct", "enum", "impl", "trait", "mod", "use", "const", "static", "type", "let",
+        "match", "extern",
     ];
-    let starts_with_word = |s: &str, w: &str| {
-        s.strip_prefix(w)
-            .map(|rest| {
-                rest.chars()
-                    .next()
-                    .is_none_or(|c| !c.is_alphanumeric() && c != '_')
-            })
-            .unwrap_or(false)
+    const MODIFIERS: &[&str] = &["pub", "pub(crate)", "async", "unsafe"];
+    let mut words = t.split_whitespace();
+    let mut head = words.next().unwrap_or("");
+    if MODIFIERS.contains(&head) {
+        head = words.next().unwrap_or("");
+    }
+    let head_word: &str = head
+        .split(|c: char| !c.is_alphanumeric() && c != '_')
+        .next()
+        .unwrap_or("");
+    KEYWORDS.contains(&head_word)
+        || t.contains("::")
+        || t.contains("->")
+        || t.contains("=>")
+        || field_line(t)
+}
+
+/// The field-line shape, kept tight on purpose: one identifier, a colon, ONE
+/// type expression carrying no sentence structure, then a comma, optionally
+/// behind `pub` or `pub(crate)`. A definition list writes several words after
+/// its colon, so `- name: the person who signed,` never matches, and a bare
+/// element line (a lone token and a comma) is not this shape and is not
+/// counted at all.
+fn field_line(t: &str) -> bool {
+    let Some(body) = t.strip_suffix(',') else {
+        return false;
     };
-    if ITEM_KEYWORDS.iter().any(|k| starts_with_word(t, k)) {
-        return true;
+    let body = body
+        .strip_prefix("pub(crate) ")
+        .or_else(|| body.strip_prefix("pub "))
+        .unwrap_or(body)
+        .trim();
+    let Some((name, ty)) = body.split_once(':') else {
+        return false;
+    };
+    // A path separator means the colon was not the field colon.
+    if name.ends_with(':') || ty.starts_with(':') {
+        return false;
     }
-    // `pub`-opened items: `pub fn`, `pub(crate) struct`, `pub use`, ...
-    if starts_with_word(t, "pub") {
-        return t
-            .split(|c: char| !c.is_alphanumeric() && c != '_')
-            .any(|tok| ITEM_KEYWORDS.contains(&tok));
+    let name = name.trim();
+    if name.is_empty()
+        || !name.chars().all(|c| c.is_alphanumeric() || c == '_')
+        || !name
+            .chars()
+            .next()
+            .is_some_and(|c| c.is_alphabetic() || c == '_')
+    {
+        return false;
     }
-    false
+    // One type expression: an identifier, a path, a reference, or a generic,
+    // written as a single whitespace-free token once references and generics
+    // are allowed their own spaces.
+    let ty = ty.trim();
+    if ty.is_empty() {
+        return false;
+    }
+    let compact: String = ty.chars().filter(|c| !c.is_whitespace()).collect();
+    let spaced_words = ty.split_whitespace().count();
+    // `&'a str` and `Vec<T, A>` keep their spaces, so a second word counts
+    // only when the type carries generic or reference syntax.
+    let syntactic = compact.contains(['<', '&', ':']);
+    if spaced_words > 1 && !syntactic {
+        return false;
+    }
+    compact.chars().all(|c| {
+        c.is_alphanumeric()
+            || matches!(
+                c,
+                '_' | ':' | '<' | '>' | '&' | '\'' | ',' | '[' | ']' | '(' | ')'
+            )
+    }) && compact
+        .chars()
+        .next()
+        .is_some_and(|c| c.is_alphabetic() || matches!(c, '_' | '&' | '(' | '['))
 }
 
 /// Byte range of each line, excluding the line terminator.

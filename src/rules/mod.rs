@@ -8,6 +8,7 @@ pub mod density;
 pub mod duplication;
 pub mod emphasis;
 pub mod mechanical;
+pub mod process_facts;
 pub mod profile_contract;
 pub mod rendered;
 pub mod structural;
@@ -96,6 +97,18 @@ pub fn implemented_param_keys() -> &'static [(&'static str, &'static str)] {
         ("SLOP-C007", "clause_window_bytes"),
         ("SLOP-C007", "imperative_openers"),
         ("SLOP-C007", "second_person"),
+        // C010 declares tool_nouns once for both rules; F004 reads it there.
+        ("SLOP-C010", "tool_nouns"),
+        ("SLOP-C010", "product_names"),
+        ("SLOP-C010", "imperative_negations"),
+        ("SLOP-C010", "finite_negations"),
+        ("SLOP-C010", "capability_verbs"),
+        ("SLOP-C010", "hedge_markers"),
+        ("SLOP-C010", "negation_window_tokens"),
+        ("SLOP-C010", "verb_window_tokens"),
+        ("SLOP-C010", "min_clauses"),
+        ("SLOP-F004", "design_markers"),
+        ("SLOP-F004", "reception_markers"),
         ("SLOP-E003", "list_items_with_leading_bold_label"),
         ("SLOP-D001", "count_rules"),
         ("SLOP-D001", "threshold"),
@@ -169,6 +182,7 @@ pub fn implemented_rule_ids() -> Vec<&'static str> {
     let mut ids: Vec<&'static str> = ENGINE_RULES.to_vec();
     ids.extend(mechanical::HANDLED);
     ids.extend(contrast::HANDLED);
+    ids.extend(process_facts::HANDLED);
     ids.extend(duplication::HANDLED);
     ids.extend(emphasis::HANDLED);
     ids.extend(density::HANDLED);
@@ -214,6 +228,7 @@ pub fn evaluate_structural(
 ) {
     mechanical::evaluate(cp, prepared, doc, config, hits);
     contrast::evaluate(cp, prepared, norm, config, hits);
+    process_facts::evaluate(cp, prepared, norm, config, hits);
     duplication::evaluate(cp, prepared, norm, config, hits);
     emphasis::evaluate(cp, prepared, doc, config, hits);
     structural::evaluate(cp, prepared, doc, config, hits);

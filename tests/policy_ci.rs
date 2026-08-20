@@ -47,7 +47,7 @@ fn every_rule_has_guard_tier_lifecycle_and_profiles() {
 #[test]
 fn engines_compile_once_and_load() {
     let cp = ai_slop::engine::compiled().expect("policy compiles");
-    assert_eq!(cp.pkg.rules.len(), 81);
+    assert_eq!(cp.pkg.rules.len(), 83);
 }
 
 #[test]
@@ -98,6 +98,51 @@ fn owner_mandated_sets_are_marked() {
     }
     let j = pkg.rule_by_id("SLOP-J001").unwrap();
     assert!(j.human_only_waiver);
+}
+
+/// One tool-noun set serves both SLOP-C010 and SLOP-F004. It is declared on
+/// C010's block and read there by both rules, so the pin is on the contents
+/// and on the absence of a second declaration. An empty or shrunken set
+/// leaves F004 unanchored and silent, which is why this is a test and not a
+/// comment.
+#[test]
+fn the_shared_tool_noun_set_is_declared_once_and_carries_both_spellings() {
+    let pkg = policy::load().unwrap();
+    let c010 = pkg.rule_by_id("SLOP-C010").unwrap();
+    let nouns: Vec<String> = c010
+        .params
+        .as_table()
+        .and_then(|t| t.get("tool_nouns"))
+        .and_then(|v| v.as_array())
+        .map(|a| {
+            a.iter()
+                .filter_map(|v| v.as_str().map(|s| s.to_string()))
+                .collect()
+        })
+        .expect("C010 declares the shared tool-noun set");
+    for singular in [
+        "tool", "linter", "crate", "rule", "check", "gate", "detector", "guard", "report",
+        "finding", "score", "output", "result", "test",
+    ] {
+        assert!(
+            nouns.iter().any(|n| n == singular),
+            "shared set is missing {singular}"
+        );
+        let plural = format!("{singular}s");
+        assert!(nouns.contains(&plural), "shared set is missing {plural}");
+    }
+    assert_eq!(
+        nouns.len(),
+        28,
+        "the set carries 14 nouns in both spellings"
+    );
+    let f004 = pkg.rule_by_id("SLOP-F004").unwrap();
+    assert!(
+        f004.params
+            .as_table()
+            .is_none_or(|t| !t.contains_key("tool_nouns")),
+        "F004 redeclares the shared set instead of reading C010's"
+    );
 }
 
 /// Param-coverage gate: the violations a package's declared params raise

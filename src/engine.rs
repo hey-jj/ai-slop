@@ -1019,15 +1019,25 @@ fn scan_rx(
                 // starts on punctuation.
                 let first = hay[span.clone()].chars().next();
                 if matches!(first, Some('.' | '!' | '?')) {
-                    // A digit immediately before the punctuation is a list
-                    // ordinal or a decimal ("2. While ..."), not a sentence
-                    // end.
-                    if hay[..span.start]
+                    // A digit run that opens its line is a list marker
+                    // ("2. Granted ..."), so the period is structure. A digit
+                    // that follows other text on the line closes a real
+                    // sentence ("version 2. Granted ..."), so only the marker
+                    // suppresses.
+                    let before = &hay[..span.start];
+                    if before
                         .chars()
                         .next_back()
                         .is_some_and(|c| c.is_ascii_digit())
                     {
-                        continue;
+                        let line = before.rfind('\n').map(|p| p + 1).unwrap_or(0);
+                        if before[line..]
+                            .trim_start()
+                            .chars()
+                            .all(|c| c.is_ascii_digit())
+                        {
+                            continue;
+                        }
                     }
                     // An abbreviation or mid-sentence period ("e.g. while
                     // ...") is not a sentence end — SLOP-C007's terminal

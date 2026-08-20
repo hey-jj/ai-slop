@@ -126,14 +126,40 @@ fn known_matrix_points() {
         rule("SLOP-W002").stance(Profile::InternalDoc, Field::Whole),
         Stance::Off
     );
+    // v0.1.9 additions: C010 follows C007's stance, and F004 follows the
+    // process-facts family's internal-doc exemption on top of api-docs relax.
+    assert_eq!(
+        rule("SLOP-C010").stance(Profile::Readme, Field::Whole),
+        Stance::Apply
+    );
+    assert_eq!(
+        rule("SLOP-C010").stance(Profile::ApiDocs, Field::Whole),
+        Stance::Relax
+    );
+    assert_eq!(
+        rule("SLOP-C010").stance(Profile::InternalDoc, Field::Whole),
+        Stance::Apply
+    );
+    assert_eq!(
+        rule("SLOP-F004").stance(Profile::Readme, Field::Whole),
+        Stance::Apply
+    );
+    assert_eq!(
+        rule("SLOP-F004").stance(Profile::ApiDocs, Field::Whole),
+        Stance::Relax
+    );
+    assert_eq!(
+        rule("SLOP-F004").stance(Profile::InternalDoc, Field::Whole),
+        Stance::Off
+    );
 }
 
 #[test]
 fn tier_counts_are_pinned() {
     let pkg = policy::load().unwrap();
-    assert_eq!(pkg.rules.len(), 81);
+    assert_eq!(pkg.rules.len(), 83);
     let count = |t: Tier| pkg.rules.iter().filter(|r| r.tier == t).count();
     assert_eq!(count(Tier::Violation), 30);
-    assert_eq!(count(Tier::Candidate), 46);
+    assert_eq!(count(Tier::Candidate), 48);
     assert_eq!(count(Tier::CoverageHint), 5);
 }

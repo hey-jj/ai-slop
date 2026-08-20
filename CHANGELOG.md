@@ -1,5 +1,66 @@
 # Changelog
 
+## [0.1.9] - 2026-08-20
+
+### Added
+
+- SLOP-C010 proleptic-capability-denial: a candidate rule for denials of a
+  capability nobody claimed, and for the evidential hedges stacked on them.
+  The subject opens its clause and comes from a closed set, and a denied
+  capability verb is required from a closed list, so denying a function
+  (`never fires on irregularity`) reads as the scope fact it is. Two
+  qualifying clauses in one block report, and so does a single one standing
+  beside a sentence that describes the same subject affirmatively, where
+  either a bare pronoun or a second tool noun carries the reference. A third
+  spelling carries no subject, so a denial fragment in the middle of a stack
+  (`never scores voice`) counts too. Commands are excluded one clause at a
+  time: only `do not`, `don't`, and `never` can head one, and only over a
+  plain verb, since the finite negations need a subject. A leading coordinator
+  is skipped before every test. The affirmative partner is searched in the
+  qualifying clause's own sentence first, then the sentence before, then the
+  sentence after, and the two sides corefer on a bare pronoun or on the same
+  tool-noun lemma. Each qualifying clause reports on its own: a denial with a
+  subject reports its coordinator-cut segment, and an evidential hedge reports
+  the whole comma-delimited clause. Off nowhere, relaxed on api-docs.
+- SLOP-F004 rationale-leak: a candidate rule for sentences that argue for the
+  design instead of stating what happens and what to do. Two marker families,
+  the bargain behind a choice and an instruction on how to take the text, both
+  anchored on a tool noun anywhere in the same sentence, so `This poem should
+  be read as an elegy` stays silent. Each marker reports on its own, so a
+  sentence carrying two reasons yields two findings. Relaxed on api-docs, off
+  on internal-doc. The anchor set is SLOP-C010's, read from
+  that block, so the two rules cannot drift apart.
+- SLOP-C007 gains the `and not` spelling before a preposition or article. The
+  `or not` and `but not` spellings stay on the skill's reread checklist,
+  because `whether or not the flag is present` is an honest open condition
+  wearing the same letters.
+
+### Changed
+
+- The raw-source guard reads a two-arm line test. Comment and attribute
+  openers and punctuation-only lines carry themselves. Every other line has to
+  end on a code terminator AND open on a keyword, carry a path or arrow token,
+  or have the field-line shape. A definition list writes several words after
+  its colon, so it is never a field line. The bar moved to thirty-five
+  percent. Measured over this tree: all twenty-two source files are
+  rejected, the four prose surfaces score zero, and the lowest source score
+  clears the highest prose score by thirty-eight points.
+- SLOP-C004's sentence-boundary arm reads a real ordinal test. A digit run
+  that opens its line is a list marker and suppresses the match. A digit
+  following other text on the line closes a sentence and fires, so
+  `version 2. Granted, ...` is a finding where it used to be silent.
+
+### Documentation
+
+- The skill states that the check and the reread are one procedure, adds two
+  questions for the final reread, carries the rationale leak as its own
+  hand-read entry, carries the proleptic capability-denial stack as the eighth
+  contrastive-negation shape with its three hand-read spellings, records the
+  conjunction spellings the pattern leaves behind, and lists the dangling
+  which-clause and the empty restatement among the patterns no rule will
+  catch.
+- Policy 1.5.0. The snapshot reference is regenerated.
+
 ## [0.1.8] - 2026-08-19
 
 ### Added

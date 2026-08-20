@@ -122,12 +122,12 @@ fn profile_exemptions_round_trip_and_digest() {
             );
         }
     }
-    assert_eq!(pkg.version, "1.4.0");
+    assert_eq!(pkg.version, "1.5.0");
     assert_eq!(pkg.digest, policy::compute_digest());
     let cp = ai_slop::engine::compiled().unwrap();
     let snapshot = ai_slop::skill::generate(&cp.pkg);
     assert!(snapshot.contains(&pkg.digest));
-    assert!(snapshot.contains("policy version: 1.4.0"));
+    assert!(snapshot.contains("policy version: 1.5.0"));
 }
 
 // --- P2: SLOP-X004 house-report-template exemption --------------------------
@@ -311,30 +311,54 @@ fn c004_mid_sentence_temporal_while_stays_silent() {
 }
 
 /// The staged-agreement pattern keeps its sentence-boundary arm, and that
-/// boundary is now a REAL one: a list ordinal's period ("has 2. Granted")
-/// and an abbreviation's period ("e.g. granted") no longer open a match,
-/// via the non-digit requirement and SLOP-C007's own terminal test.
+/// boundary is now a REAL one: a list marker's period ("2. Granted") and an
+/// abbreviation's period ("e.g. granted") no longer open a match, via the
+/// ordinal test and SLOP-C007's own terminal test.
+///
+/// The ordinal test replaced a blanket digit test that suppressed after ANY
+/// digit-final text, which is why "The list has 2. Granted, ..." was pinned
+/// silent here through 0.1.8. Evidence for the change: in that sentence the
+/// numeral is the object of `has` and the period closes a real sentence,
+/// which is the same shape as "version 2. Granted, ...". The two cannot both
+/// hold, and both now fire. Only a digit run that OPENS its line is a list
+/// marker, and the marker case is read in the text format, where a line
+/// break survives into the norm view. Under markdown a numbered item is
+/// structure the extractor strips, and the line-start alternative reads the
+/// remaining opening on its own, which is a separate reporting path.
 #[test]
-fn c004_sentence_boundary_arm_rejects_ordinals_and_abbreviations() {
+fn c004_sentence_boundary_arm_rejects_list_markers_and_abbreviations() {
+    let marker = "2. Granted, the code is shorter, but it hides the cost.\n";
+    let mut text_cfg = common::cfg(Profile::InternalDoc);
+    text_cfg.input_format = ai_slop::InputFormat::Text;
+    let report = ai_slop::analyze(marker.as_bytes(), &text_cfg).expect("analyze must succeed");
+    assert_invariants(marker, &report);
+    assert!(
+        !has_rule(&report, "SLOP-C004"),
+        "a list marker opened a match: {:?}",
+        common::rule_ids(&report)
+    );
+
+    let abbrev = "See the docs, e.g. granted, the flag is set, but the cache stays cold.\n";
+    let report = run(abbrev, Profile::InternalDoc);
+    assert_invariants(abbrev, &report);
+    assert!(
+        !has_rule(&report, "SLOP-C004"),
+        "an abbreviation opened a match: {:?}",
+        common::rule_ids(&report)
+    );
     for t in [
+        "It shipped early. Granted, the code is shorter, but it hides the cost.\n",
         "The list has 2. Granted, the code is shorter, but it hides the cost.\n",
-        "See the docs, e.g. granted, the flag is set, but the cache stays cold.\n",
+        "The stable protocol is version 2. Granted, the code is shorter, but it hides the cost.\n",
     ] {
         let report = run(t, Profile::InternalDoc);
         assert_invariants(t, &report);
         assert!(
-            !has_rule(&report, "SLOP-C004"),
-            "fake sentence boundary opened a match: {t:?} {:?}",
+            has_rule(&report, "SLOP-C004"),
+            "real sentence boundary lost: {t:?} {:?}",
             common::rule_ids(&report)
         );
     }
-    let t = "It shipped early. Granted, the code is shorter, but it hides the cost.\n";
-    let report = run(t, Profile::InternalDoc);
-    assert!(
-        has_rule(&report, "SLOP-C004"),
-        "real sentence boundary lost: {:?}",
-        common::rule_ids(&report)
-    );
 }
 
 /// The reconstruction fixture (the original session sentence was reworded
