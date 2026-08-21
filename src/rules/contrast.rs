@@ -144,6 +144,150 @@ pub(crate) fn period_is_terminal(text: &str, dot_end: usize) -> bool {
     }
 }
 
+/// The copulas a progressive is built on, and the test over one `while`
+/// clause. `while` heads two different sentences that wear the same shape:
+/// the concession the rule is about, and the plain statement that two things
+/// happen at once. A progressive in the clause up to the comma settles it.
+/// "While you are working" puts a stretch of time in front of the comma, which
+/// no concession does, so the line-anchored arm matches first and drops here.
+/// `although` and `though` never get this test: neither word has a temporal
+/// reading.
+///
+/// A participle straight after the keyword settles it the other way round.
+/// "While working on the migration" and "While reviewing the patch" name a
+/// stretch of time by naming the activity that filled it. Eight participles
+/// are the exception, because concession is the only thing they do in that
+/// slot: a writer who opens with "While acknowledging the risk" is granting a
+/// point, not reporting an activity.
+///
+/// That drop asks for one more thing: no finite verb anywhere between the
+/// keyword and the comma. A participial adjunct has no clause of its own, so
+/// it never carries one, while a concession that opens on an -ing word always
+/// does. "While programming language parsers are usually written manually"
+/// keeps its `are`, and "While manipulating ASTs is the most flexible way"
+/// keeps its `is`, so both stay concessions. The test reads a closed list of
+/// twenty words and does no morphology, because an `-s` scan would call
+/// "operations" and "parts" verbs and take back the clears the drop is for.
+/// `be`, `been`, and `being` stay out of the list, so "While being tested"
+/// still drops.
+///
+/// A durative present without the copula ("While the build runs, grab a
+/// coffee") reads as time to a person and as concession to this test, so it
+/// still fires and the judge question settles it. So does a copula with an
+/// adjective after it ("While W is busy with `a`"), which wears exactly the
+/// shape of a real concession ("While the parser is slower") and cannot be
+/// told from one. In the other direction, a bare-form plural verb is finite
+/// without being on the list, so "While parsing tools handle this correctly"
+/// drops, the same hole a plural subject opens in SLOP-C010.
+pub(crate) fn temporal_while(matched: &str) -> bool {
+    const COPULAS: &[&str] = &["am", "is", "are", "was", "were", "be", "being"];
+    /// The finite verbs the participle test looks for. A closed list, matched
+    /// whole and never by suffix.
+    const FINITE: &[&str] = &[
+        "am", "is", "are", "was", "were", "has", "have", "had", "do", "does", "did", "can",
+        "could", "will", "would", "shall", "should", "may", "might", "must",
+    ];
+    /// The participles that concede rather than report an activity.
+    const CONCESSION_PARTICIPLES: &[&str] = &[
+        "acknowledging",
+        "recognizing",
+        "granting",
+        "accepting",
+        "conceding",
+        "admitting",
+        "noting",
+        "allowing",
+    ];
+    let clause = matched.trim_start();
+    if !clause
+        .get(..5)
+        .is_some_and(|s| s.eq_ignore_ascii_case("while"))
+    {
+        return false;
+    }
+    if clause[5..]
+        .chars()
+        .next()
+        .is_some_and(|c| c.is_alphanumeric() || c == '\'')
+    {
+        return false;
+    }
+    // The concession sits between the keyword and the first comma. A greedy
+    // match can run past that comma to a later one, and what the second half
+    // of such a line says has no bearing on how the first half reads.
+    let clause = match clause.find(',') {
+        Some(at) => &clause[..at],
+        None => clause,
+    };
+    let toks = tokenize(clause, 0..clause.len());
+    // A participle in the very next slot, with the eight concessions held out,
+    // the quantifier pronouns held out by the shared morphology list, and no
+    // finite verb between the keyword and the comma.
+    let finite = toks
+        .iter()
+        .skip(1)
+        .any(|t| FINITE.contains(&t.word.as_str()));
+    if let Some(next) = toks.get(1) {
+        let w = next.word.as_str();
+        if !finite
+            && verb_form(w) == VerbForm::Participle
+            && !CONCESSION_PARTICIPLES.contains(&w)
+            && !NOT_PARTICIPLES.contains(&w)
+        {
+            return true;
+        }
+    }
+    // One optional token may sit between the copula and the participle, since
+    // "were already running" is the same progressive as "were running". It
+    // qualifies by an -ly ending or by the closed list, and one is the cap: a
+    // second token means the copula governs something else.
+    const ADVERBS: &[&str] = &[
+        "still",
+        "already",
+        "yet",
+        "now",
+        "just",
+        "also",
+        "again",
+        "always",
+        "currently",
+        "never",
+    ];
+    let adjacent = |a: &Tok, b: &Tok| {
+        let gap = &clause[a.end..b.start];
+        !gap.is_empty() && gap.len() <= 8 && gap.chars().all(char::is_whitespace)
+    };
+    let participle =
+        |t: &Tok| t.word.len() >= 4 && t.word.get(1..).is_some_and(|s| s.contains("ing"));
+    let skippable = |t: &Tok| t.word.ends_with("ly") || ADVERBS.contains(&t.word.as_str());
+    toks.iter().enumerate().any(|(i, cop)| {
+        if !COPULAS.contains(&cop.word.as_str()) {
+            return false;
+        }
+        let Some(next) = toks.get(i + 1) else {
+            return false;
+        };
+        if !adjacent(cop, next) {
+            return false;
+        }
+        if participle(next) {
+            return true;
+        }
+        // The one allowed step over, and no further.
+        if !skippable(next) {
+            return false;
+        }
+        toks.get(i + 2)
+            .is_some_and(|t| adjacent(next, t) && participle(t))
+    })
+}
+
+/// Five words that end in the same three letters without being participles.
+/// The list is English morphology, the same kind of fact as the base-form
+/// suffix test, so it lives in code beside the parser that reads it instead of
+/// in policy data.
+const NOT_PARTICIPLES: &[&str] = &["nothing", "anything", "something", "everything", "during"];
+
 /// Parse the T1 tail shape starting at the comma at `comma`: up to 8
 /// whitespace characters, `not` or `never` (case-insensitive, followed by
 /// 1..=8 whitespace), then an NP of 1..=`np_max` bytes containing none of
@@ -202,6 +346,21 @@ fn parse_tail(text: &str, comma: usize, np_max: usize) -> Option<usize> {
         }
     }
     if ws == 0 {
+        return None;
+    }
+    // A participle sitting straight after the keyword is an adjunct, not a
+    // noun phrase: "never judging anyone" says how the subject acted, and
+    // rewriting it as a positive claim is not something a reader can do. The
+    // word has to follow the keyword with nothing in between, so a determiner
+    // keeps the tail in scope ("not the beginning", "not a building"), and
+    // five words that end the same way without being participles are named
+    // outright.
+    let head: String = rest[j..]
+        .chars()
+        .take_while(|c| c.is_alphanumeric() || *c == '\'' || *c == '-')
+        .flat_map(char::to_lowercase)
+        .collect();
+    if verb_form(&head) == VerbForm::Participle && !NOT_PARTICIPLES.contains(&head.as_str()) {
         return None;
     }
     // NP scan: bounded, no clause punctuation, must close with a terminal,
@@ -465,14 +624,18 @@ pub(crate) struct PhraseMatch {
     pub head: Option<usize>,
 }
 
-/// Match `phrase` at token `i`. A `*` element stands for one or two tokens,
-/// tried longest first, so `no single finding is evidence` matches the same
-/// entry as `no finding is evidence` and the two-token spelling cannot slip
-/// past the list. Three tokens is a recorded miss, not an oversight: the cap
-/// keeps the scan bounded and keeps a long noun phrase from swallowing the
-/// copula.
+/// Match `phrase` at token `i`. A `*` element stands for one to three tokens,
+/// tried longest first, so `no single early finding is evidence` matches the
+/// same entry as `no finding is evidence` and a stack of modifiers cannot slip
+/// past the list.
+///
+/// The scan stops at three because four admits an of-phrase, and the head noun
+/// the coreference test reads is the last wildcard token before the copula. In
+/// `no finding in the report is evidence` that token would be `report`, so the
+/// test would ask about the wrong noun and answer confidently. Stopping short
+/// leaves a four-token noun phrase unmatched, which is silence.
 pub(crate) fn phrase_match(toks: &[Tok], i: usize, phrase: &str) -> Option<PhraseMatch> {
-    const WILDCARD_MAX: usize = 2;
+    const WILDCARD_MAX: usize = 3;
     let parts: Vec<&str> = phrase.split_whitespace().collect();
     if parts.is_empty() {
         return None;
@@ -614,6 +777,14 @@ struct ClauseRead {
     /// Set when this segment is itself an affirmative description of the
     /// artifact, which makes it an Arm B partner for its own sentence.
     affirmative: Option<String>,
+    /// True when the segment carries a closed-set subject at its head, which
+    /// is what an `and`-joined denial later in the sentence leans on.
+    has_subject: bool,
+    /// True for the `and`-joined shape the command test would otherwise take:
+    /// `and` opens the segment, an imperative-capable negation heads it, and
+    /// the verb it governs is a base-form capability verb. The caller decides,
+    /// because the decision needs the rest of the sentence.
+    joined_denial: bool,
 }
 
 impl ClauseRead {
@@ -721,6 +892,19 @@ fn is_base_form(word: &str) -> bool {
     true
 }
 
+/// The token a negation governs, with one `-ly` adverb allowed to sit in
+/// between. "Never actually scores voice" governs `scores`, the same word
+/// "Never scores voice" governs, so the command test reads the same verb in
+/// both. Only an `-ly` word is stepped over: everything else is the governed
+/// token itself.
+fn governed_token(toks: &[Tok], from: usize) -> Option<&Tok> {
+    let at = match toks.get(from) {
+        Some(t) if t.word.ends_with("ly") => from + 1,
+        _ => from,
+    };
+    toks.get(at)
+}
+
 /// A capability verb of an accepted form inside `from..from + window`.
 fn capability_verb_in(
     toks: &[Tok],
@@ -739,7 +923,12 @@ fn capability_verb_in(
 ///
 /// A command is excluded first, and only an imperative-capable negation can
 /// head one: the finite forms need a subject, so a clause they head is always
-/// declarative. `Do not obey` is a command because `obey` is base form.
+/// declarative. `Do not obey` is a command because `obey` is base form, read
+/// with one `-ly` adverb allowed to sit between the negation and its verb.
+/// One excluded shape is recorded rather than dropped: a segment that opens on
+/// `and` and denies a capability in base form finishes a sentence, and whether
+/// it is a command depends on what the sentence said first. The caller settles
+/// that, and this reader stays a function of its own segment.
 ///
 /// Family 1 has three spellings, and every one needs a denied capability
 /// verb, because denying a function is an honest scope fact while denying a
@@ -771,6 +960,8 @@ fn read_clause(
         open_complement: false,
         subject: None,
         affirmative: None,
+        has_subject: false,
+        joined_denial: false,
     };
     // A leading coordinator is skipped before every test, so the second half
     // of a coordinated denial reads the same as the first.
@@ -787,12 +978,25 @@ fn read_clause(
 
     // The command test, imperative-capable heads only.
     if let Some(end) = sets.negation_end(&toks, lead, &sets.imperative_negations) {
-        if toks.get(end).is_some_and(|t| is_base_form(&t.word)) {
+        if governed_token(&toks, end).is_some_and(|t| is_base_form(&t.word)) {
+            // `and never detect authorship` wears a command's grammar and
+            // finishes a sentence that already named its subject. The reading
+            // needs the rest of the sentence, so it is recorded and the caller
+            // settles it. `and` alone opens this shape: `but` and `so` mark a
+            // turn, and a comma leaves the imperative reading open.
+            if toks.first().is_some_and(|t| t.word == "and")
+                && capability_verb_in(&toks, end, sets.verb_window, &sets.capability_verbs, |f| {
+                    f == VerbForm::Base
+                })
+            {
+                out.joined_denial = true;
+            }
             return out;
         }
     }
 
     if let Some(subject) = sets.subject(&toks, lead) {
+        out.has_subject = true;
         out.subject = Some(subject.key.clone());
         if !subject.negative && !has_negation && !has_hedge {
             out.affirmative = Some(subject.key.clone());
@@ -1081,6 +1285,24 @@ fn evaluate_c010(
                 for segment in segment_ranges(text, clause.clone()) {
                     segs.push(read_clause(text, segment, clause.clone(), &sets));
                 }
+            }
+            // The `and`-joined denial, settled here because the reader above
+            // sees one segment at a time. "The rules read text and never
+            // detect authorship" names its subject once and carries it across
+            // the coordinator, so the second half is a statement about the
+            // rules rather than an instruction to the reader. An earlier
+            // segment of the same sentence has to supply that subject, which
+            // is what keeps "Read the report and never judge by one finding"
+            // and a bare "Never detect authorship" out. The denial has no
+            // subject of its own, so it is coreferent with whatever the
+            // sentence already named.
+            let mut named = false;
+            for seg in &mut segs {
+                if seg.joined_denial && named {
+                    seg.qualifies = true;
+                    seg.subject = Some("pronoun".to_string());
+                }
+                named |= seg.has_subject;
             }
             reads.push(segs);
         }

@@ -122,12 +122,12 @@ fn profile_exemptions_round_trip_and_digest() {
             );
         }
     }
-    assert_eq!(pkg.version, "1.5.0");
+    assert_eq!(pkg.version, "1.6.0");
     assert_eq!(pkg.digest, policy::compute_digest());
     let cp = ai_slop::engine::compiled().unwrap();
     let snapshot = ai_slop::skill::generate(&cp.pkg);
     assert!(snapshot.contains(&pkg.digest));
-    assert!(snapshot.contains("policy version: 1.5.0"));
+    assert!(snapshot.contains("policy version: 1.6.0"));
 }
 
 // --- P2: SLOP-X004 house-report-template exemption --------------------------
@@ -327,16 +327,48 @@ fn c004_mid_sentence_temporal_while_stays_silent() {
 /// remaining opening on its own, which is a separate reporting path.
 #[test]
 fn c004_sentence_boundary_arm_rejects_list_markers_and_abbreviations() {
+    // The ordinal period is still not a sentence boundary. What changed is the
+    // marker itself: the text reader hands it to the rules as structure now,
+    // the way markdown always did, so "Granted" opens its line and the match
+    // arrives through the line-start arm instead. Both formats report the same
+    // span on the same bytes, and it opens after the marker per P11.
     let marker = "2. Granted, the code is shorter, but it hides the cost.\n";
+    for format in [ai_slop::InputFormat::Text, ai_slop::InputFormat::Markdown] {
+        let mut cfg = common::cfg(Profile::InternalDoc);
+        cfg.input_format = format;
+        let report = ai_slop::analyze(marker.as_bytes(), &cfg).expect("analyze must succeed");
+        assert_invariants(marker, &report);
+        let found: Vec<_> = report
+            .findings
+            .iter()
+            .filter(|f| f.rule_id == "SLOP-C004")
+            .collect();
+        assert_eq!(
+            found.len(),
+            1,
+            "{format:?}: {:?}",
+            common::rule_ids(&report)
+        );
+        assert_eq!(
+            (found[0].spans[0].start, found[0].spans[0].end),
+            (3, 36),
+            "{format:?}: the span opens after the marker"
+        );
+    }
+    // A mid-line ordinal is still not a boundary, which is what this test is
+    // named for.
+    let inline = "The list has 2. Granted, the code is shorter, but it hides the cost.\n";
     let mut text_cfg = common::cfg(Profile::InternalDoc);
     text_cfg.input_format = ai_slop::InputFormat::Text;
-    let report = ai_slop::analyze(marker.as_bytes(), &text_cfg).expect("analyze must succeed");
-    assert_invariants(marker, &report);
-    assert!(
-        !has_rule(&report, "SLOP-C004"),
-        "a list marker opened a match: {:?}",
-        common::rule_ids(&report)
-    );
+    let report = ai_slop::analyze(inline.as_bytes(), &text_cfg).expect("analyze must succeed");
+    assert_invariants(inline, &report);
+    let found: Vec<_> = report
+        .findings
+        .iter()
+        .filter(|f| f.rule_id == "SLOP-C004")
+        .collect();
+    assert_eq!(found.len(), 1);
+    assert_eq!((found[0].spans[0].start, found[0].spans[0].end), (16, 49));
 
     let abbrev = "See the docs, e.g. granted, the flag is set, but the cache stays cold.\n";
     let report = run(abbrev, Profile::InternalDoc);

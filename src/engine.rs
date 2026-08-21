@@ -770,6 +770,29 @@ fn accept_word_hit(
             }
         }
     }
+    // A rule may anchor part of its lexicon instead of all of it. Entries
+    // listed in `match.params.block_start_only` fire only where they open a
+    // sentence, a line, or a list item; the rest of the same lexicon is read
+    // anywhere. Only a matched span reaches here, so the list costs nothing
+    // to consult.
+    if let Some(anchored) = rule
+        .params
+        .as_table()
+        .and_then(|t| t.get("block_start_only"))
+        .and_then(|v| v.as_array())
+    {
+        let matched = hay[span.clone()].to_lowercase();
+        if anchored
+            .iter()
+            .filter_map(|v| v.as_str())
+            .any(|e| e == matched)
+        {
+            match norm {
+                Some(n) if n.is_block_start(span.start) => {}
+                _ => return,
+            }
+        }
+    }
     // The filler rule's "overall" entry fires only at block start.
     if rule.id == "SLOP-T001" {
         let matched = hay[span.clone()].to_ascii_lowercase();
@@ -1047,6 +1070,23 @@ fn scan_rx(
                     {
                         continue;
                     }
+                    // The span the reader gets opens at the concession word.
+                    // The terminal punctuation and the whitespace after it
+                    // licensed the match and belong to the sentence before,
+                    // which in a list is a whole block earlier.
+                    let mut at = span.start + first.map_or(0, char::len_utf8);
+                    while let Some(c) = hay[at..].chars().next() {
+                        if c.is_whitespace() {
+                            at += c.len_utf8();
+                        } else {
+                            break;
+                        }
+                    }
+                    if at < span.end {
+                        span.start = at;
+                    }
+                } else if crate::rules::contrast::temporal_while(&hay[span.clone()]) {
+                    continue;
                 }
             }
             "SLOP-E002" => {

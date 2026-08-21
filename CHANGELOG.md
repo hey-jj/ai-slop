@@ -1,5 +1,120 @@
 # Changelog
 
+## [0.1.10] - 2026-08-20
+
+### Changed
+
+- SLOP-C004 tells a concession from a stretch of time. `although` and `though`
+  match unqualified, since neither word has a temporal reading. A `while`
+  match drops when a participle sits straight after the keyword, so
+  `While working on the migration, we found a race` is silent. Eight
+  participles are held out because conceding is all they do in that slot:
+  `acknowledging`, `recognizing`, `granting`, `accepting`, `conceding`,
+  `admitting`, `noting`, and `allowing`. The drop also asks for no finite verb
+  between the keyword and the comma, from a closed list of twenty read whole
+  and never by suffix, so `While programming language parsers are usually
+  written manually` keeps its concession and `While being tested, the parser
+  reports` still drops. A `while` match also drops when the clause up to the
+  comma carries a progressive, so `While you are working, you might notice
+  unexpected changes` is silent. `While the parser is slower, it handles more
+  cases` still fires, and so do the shapes the guard records: a durative
+  present with no copula (`While the build runs, grab a coffee`) and a copula
+  with an adjective, which is inseparable from a real concession.
+- SLOP-C004's staged-agreement span opens at the concession word. The match is
+  licensed by the terminal punctuation of the sentence before, which across
+  two list items sits in an earlier block, and that punctuation is no longer
+  part of what the reader is asked to rewrite.
+- SLOP-C010 reads a fourth family-1 shape. A segment that opens on `and`, is
+  headed by `do not`, `don't`, or `never`, and denies a capability in plain
+  form is a statement when an earlier segment of the same sentence already
+  named a closed-set subject, so `The rules read text and never detect
+  authorship` reports on the adjacency arm with the segment span. `but`, `so`,
+  a comma, and a sentence break all leave the imperative reading in place.
+- SLOP-C010's command test steps over one `-ly` adverb, so
+  `Never actually scores voice` reaches the same verb as `Never scores voice`.
+- SLOP-C010's open hedge takes one to three tokens in front of the head noun,
+  so `no single early finding is evidence` matches. Four tokens would admit an
+  of-phrase and seat the head-noun test on the wrong word, so the wildcard
+  stops at three.
+- SLOP-C007's comma tail ends at a participle sitting against `not` or
+  `never`, so `never judging anyone` is silent. A determiner keeps the tail in
+  scope, and `nothing`, `anything`, `something`, `everything`, and `during` are
+  named so the four quantifier pronouns and `not during matching` keep firing.
+- The published crate carries `tests/**`, `fixtures/**`, and `CHANGELOG.md`
+  beside the sources, the policy, and the skill. `cargo package` reports no
+  ignored files, and the test suite runs from the unpacked tarball.
+- A leading run of emoji, symbols, and whitespace no longer moves a phrase off
+  the opening of its line. Every rule that reads a block-start position sees
+  what the reader sees, and all five now report behind a decoration the same
+  way they report without one: `SLOP-M003` opening `however`, `SLOP-T001`
+  opening `overall`, `SLOP-T002` transition openers, `SLOP-S001` signature
+  lines, and `SLOP-V002`'s anchored praise. Every one of the five moves the
+  same way, from silent to reporting.
+- The four bullet glyphs join the decoration a block-start test reads past, so
+  a phrase pasted from a rendered list opens its line: U+2022, U+2023, U+2043,
+  and U+2219. The middle dot U+00B7 stays out, since it leads a line in fewer
+  than one occurrence in twelve and is a letter in Catalan besides. The marker
+  set and the decoration set are two named constants now, so a later harvest
+  edits both together.
+- Plain text and commit bodies drop a leading list, quote, or heading marker
+  from the prose they hand the rules, the way markdown already did. A marker
+  led line used to push its first word off the opening of the block, which
+  left every block-start rule silent on those formats. A marker counts only
+  with whitespace after it, so `-3 degrees` and `#4` stay prose. Spans on a
+  marker-led line move by the width of the marker, and those bytes count as
+  structure now instead of prose. A marker is no longer counted as a word
+  either, so a word cap and a per-1000-words rate mean the same thing on plain
+  text, a commit body, and markdown.
+- SLOP-C004's progressive test reads over one adverb, so
+  `While we were already running the tests, ...` is silent the way
+  `While we were running the tests, ...` already was. The word qualifies by an
+  `-ly` ending or from a closed list, and one is the cap, so
+  `While the parser is still half parsing ...` keeps firing.
+- `SLOP-D004` reports on decorated and marker-led openers, because it counts
+  `SLOP-T002` hits and those openers reach it now. It is the one rule in this
+  release that moved without its own text changing.
+- `SLOP-V002` anchors eight praise phrases to the opening of a sentence, a
+  line, or a list item: `great question`, `good question`,
+  `excellent question`, `that's a great question`, `great point`,
+  `excellent point`, `you're absolutely right`, and `you are absolutely
+  right`. A sentence reporting that someone asked a great question is silent.
+  The rest of the lexicon is unanchored, and a rule may now name the anchored
+  part of its lexicon in `match.params.block_start_only`.
+- `good catch` and `great catch` are out of the assistant-voice lexicon. A
+  reviewer who opens a line with either one means it, so the position test
+  would have separated nothing. A line that pairs the catch with a second
+  praise phrase still reports on the second phrase.
+- `fair hit` joins the assistant-voice lexicon, unanchored, since the
+  concession reads the same wherever it sits. Two readings come with it and
+  both go to the judge: a hit is literal in sport and in games, and the entry
+  sits inside `unfair`.
+
+### Fixed
+
+- A document whose first character is more than one byte wide no longer fails
+  the run. A rule that reports about the whole document anchors on the first
+  character, and the anchor took a single byte, which cut an emoji, an em
+  dash, or an accented letter in half and ended the run with an
+  instrumentation error and no findings at all. All five anchoring sites take
+  the whole character.
+
+### Documentation
+
+- A test reads every rule's guard and judge text and fails on the writing rules
+  a machine can settle: em and en dashes, semicolons, contrast scaffolding, and
+  the filler words. Scope is those two fields, never the patterns or lexicons a
+  rule matches on, and a guard may still quote a term its own rule declares. The
+  punctuation classes take no such exemption.
+- The C004 and C010 guards state the behavior the code has. C004 no longer
+  claims that temporal `while` never fires, and C010 carries the joined-denial
+  shape, the instruction the judge settles, and the reason the wildcard stops
+  at three.
+- The C007 guard gives the measurement behind leaving the `or not` and
+  `but not` spellings to the reread: in a 14.7MB corpus pass all three
+  `or` hits sat inside `whether or not`, and all four `but` hits were honest
+  exclusions.
+- Policy 1.6.0. The snapshot reference is regenerated.
+
 ## [0.1.9] - 2026-08-20
 
 ### Added

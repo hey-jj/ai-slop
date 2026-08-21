@@ -89,7 +89,9 @@ fn usage() -> &'static str {
      api-docs, cargo-metadata, internal-doc\n\
      \n\
      formats (--format, defaults to the profile's declared format):\n  \
-     markdown, text, commit, manifest\n\
+     markdown, text, commit, manifest\n  \
+     reading a markdown file as text treats fences, tables, and link\n  \
+     targets as prose and inflates the findings\n\
      \n\
      exit codes:\n  \
      0   completed with no violation and no unresolved candidate\n  \

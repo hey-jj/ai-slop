@@ -1520,6 +1520,50 @@ fn find_ci_ascii(hay: &str, needle: &[u8]) -> Option<usize> {
     (0..=hb.len() - m).find(|&j| hb[j..j + m].eq_ignore_ascii_case(needle))
 }
 
+/// The byte length of the list, quote, or heading marker opening `line`, plus
+/// the whitespace after it. Markdown mode never hands a marker to the rules,
+/// because the parser reports list and quote structure separately. Plain text
+/// and commit bodies have no parser, so the same marker used to arrive as
+/// prose and pushed the first word off the opening of its line, which silently
+/// disabled every block-start rule on those formats.
+///
+/// The unordered half comes from `views::MARKER_BULLETS`, the fleet-shared
+/// list. The shapes stay here: an ordered run of digits closed by `.` or `)`,
+/// a blockquote `>`, and a heading `#`. A marker counts only with whitespace
+/// after it, so `-3 degrees` and `#4` stay prose.
+fn leading_marker_len(line: &str) -> usize {
+    let after_indent = line.len() - line.trim_start().len();
+    let rest = &line[after_indent..];
+    let mut chars = rest.char_indices();
+    let marker = match chars.next() {
+        Some((_, c)) if crate::views::MARKER_BULLETS.contains(&c) => c.len_utf8(),
+        Some((_, '>')) => 1,
+        Some((_, '#')) => {
+            let hashes = rest.chars().take_while(|c| *c == '#').count();
+            if hashes > 6 {
+                return 0;
+            }
+            hashes
+        }
+        Some((_, c)) if c.is_ascii_digit() => {
+            let digits = rest.chars().take_while(char::is_ascii_digit).count();
+            match rest[digits..].chars().next() {
+                Some('.') | Some(')') => digits + 1,
+                _ => return 0,
+            }
+        }
+        _ => return 0,
+    };
+    // The marker only opens a block when whitespace follows it. Without that
+    // the character belongs to the word.
+    let tail = &rest[marker..];
+    let spaces = tail.len() - tail.trim_start_matches([' ', '\t']).len();
+    if spaces == 0 || tail.is_empty() {
+        return 0;
+    }
+    after_indent + marker + spaces
+}
+
 fn build_text(src: &str) -> Doc {
     let mut doc = Doc::default();
     let lines = line_ranges(src);
@@ -1537,8 +1581,11 @@ fn build_text(src: &str) -> Doc {
             continue;
         }
         doc.ops.push(NormOp::Block);
+        // The marker stays outside the emitted range, so it becomes excluded
+        // structure exactly as it is in markdown mode and the first word sits
+        // at the opening of its block.
         doc.ops.push(NormOp::Text {
-            range: lr.clone(),
+            range: lr.start + leading_marker_len(line)..lr.end,
             flags: 0,
         });
         let trimmed = line.trim_start();
@@ -1548,7 +1595,10 @@ fn build_text(src: &str) -> Doc {
                 doc.stats.bullets_with_link += 1;
             }
         }
-        let w = count_words(line);
+        // Words are counted over the same slice the rules read, so a marker
+        // never counts as a word. Markdown never had that bug, and a word cap
+        // or a per-1000-words rate has to mean the same thing on both.
+        let w = count_words(&line[leading_marker_len(line)..]);
         doc.stats.word_count += w;
         para_words += w;
         prev_blank = false;
@@ -1582,10 +1632,10 @@ fn build_commit(src: &str, split: &crate::input::CommitSplit) -> Doc {
         };
         doc.ops.push(NormOp::Block);
         doc.ops.push(NormOp::Text {
-            range: lr.clone(),
+            range: lr.start + leading_marker_len(line)..lr.end,
             flags,
         });
-        doc.stats.word_count += count_words(line);
+        doc.stats.word_count += count_words(&line[leading_marker_len(line)..]);
     }
     finish(src, &mut doc, Vec::new());
     doc

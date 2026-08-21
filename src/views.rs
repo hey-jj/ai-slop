@@ -975,30 +975,105 @@ impl NormView {
     }
 
     /// True when the position begins a block or line, or follows terminal
-    /// punctuation plus whitespace.
+    /// punctuation plus whitespace. A leading run of decoration is looked
+    /// past, so the position a reader sees as the opening of a line is the
+    /// position this reports.
     pub fn is_block_start(&self, norm_offset: usize) -> bool {
         if norm_offset == 0 {
             return true;
         }
+        let skip = |c: char| c == ' ' || c == '\t' || is_leading_decoration(c);
         let before = &self.text[..norm_offset];
-        let trimmed = before.trim_end_matches([' ', '\t']);
+        let trimmed = before.trim_end_matches(skip);
         if trimmed.is_empty() || trimmed.ends_with('\n') {
             return true;
         }
         if trimmed.ends_with(['.', '!', '?', ':']) && trimmed.len() < before.len() {
             return true;
         }
-        // A recorded line start with only whitespace between it and here.
+        // A recorded line start with only whitespace and decoration between it
+        // and here.
         if let Some(&ls) = self.line_starts.iter().rev().find(|&&ls| ls <= norm_offset) {
             if self.text[ls..norm_offset]
                 .chars()
-                .all(|c| c == ' ' || c == '\t' || c == '\n')
+                .all(|c| c == '\n' || skip(c))
             {
                 return true;
             }
         }
         false
     }
+}
+
+/// The two sets a block opening is read through, kept side by side so a later
+/// harvest edits both. F-R14a and F-R14e are the fleet source: all three
+/// crates carry these same two lists, and changing one here without the others
+/// reopens the split those rulings closed.
+///
+/// `MARKER_BULLETS` is the unordered-list half of the marker set. The ordered,
+/// blockquote, and heading forms are shapes rather than characters, so they
+/// live in the reader that parses them (`extract::leading_marker_len`).
+pub(crate) const MARKER_BULLETS: [char; 7] = [
+    '-', '*', '+', '\u{2022}', // bullet
+    '\u{2023}', // triangular bullet
+    '\u{2043}', // hyphen bullet
+    '\u{2219}', // bullet operator
+];
+
+/// `DECORATION` is what a writer may put in front of the first word without
+/// moving it. The semantics block reads the block-start position after markers
+/// are stripped, and an emoji or a pasted bullet at the head of a line is a
+/// marker in that sense: it dresses the opening instead of continuing a
+/// sentence, so `🎉 Great question!` opens its line the way `Great question!`
+/// does.
+///
+/// Ranges are written out instead of read from a general-category table,
+/// because the crate carries no such table and a fixed list can be audited.
+/// Letters, digits, and the punctuation that carries a sentence forward stay
+/// out: a comma or a dash in front of a word puts the word mid-sentence, which
+/// is the whole distinction the test draws.
+///
+/// The four bullet glyphs are listed one at a time because the block ranges
+/// split them by accident. The white bullet, the small black square, and the
+/// black circle already fell inside Geometric Shapes, while U+2022, the bullet
+/// a rendered list actually pastes as, sits in General Punctuation and did
+/// not. Measured at 205 occurrences, 136 of them leading a line, across 3.08M
+/// lines. The other three carry a combined population of one and are here by
+/// analogy with U+2022 rather than on measured need.
+///
+/// U+00B7 stays out. At 2,341 occurrences only 184 lead a line, so it is
+/// overwhelmingly an inline separator, and it is a letter in Catalan besides.
+/// A word behind one is not at the opening of anything.
+const DECORATION: &[std::ops::RangeInclusive<u32>] = &[
+    0x2022..=0x2023, // bullet, triangular bullet
+    0x2043..=0x2043, // hyphen bullet
+    0x2219..=0x2219, // bullet operator
+    0x200D..=0x200D, // zero width joiner
+    0x20E3..=0x20E3, // combining enclosing keycap
+    0xFE0E..=0xFE0F, // variation selectors 15 and 16
+    0x203C..=0x203C, // double exclamation
+    0x2049..=0x2049, // exclamation question
+    0x2122..=0x2122, // trade mark
+    0x2139..=0x2139, // information
+    0x2190..=0x21FF, // arrows
+    0x2300..=0x23FF, // miscellaneous technical
+    0x24C2..=0x24C2, // circled M
+    0x25A0..=0x25FF, // geometric shapes
+    0x2600..=0x27BF, // miscellaneous symbols and dingbats
+    0x2B00..=0x2BFF, // miscellaneous symbols and arrows
+    0x3030..=0x3030,
+    0x303D..=0x303D,
+    0x3297..=0x3297,
+    0x3299..=0x3299,
+    0x1F000..=0x1FAFF, // the emoji planes
+];
+
+/// This table answers one question and serves one caller. Widening a function
+/// that another rule already reads would change that rule too, which is the
+/// coupling F-R14e went out of its way to avoid.
+fn is_leading_decoration(c: char) -> bool {
+    let u = c as u32;
+    DECORATION.iter().any(|r| r.contains(&u))
 }
 
 #[cfg(test)]

@@ -181,7 +181,7 @@ pub fn evaluate(
                     || (got.len() <= want.len() + max_extra
                         && want.iter().all(|l| got.contains(l)));
                 if !ok {
-                    hits.push(Hit::new(idx, 0..src.len().min(1)));
+                    hits.push(Hit::new(idx, super::document_anchor(src)));
                 }
             }
             None => {

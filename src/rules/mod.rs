@@ -78,6 +78,18 @@ pub const ENGINE_RULES: &[&str] = &[
     "SLOP-K008",
 ];
 
+/// The one-character span a whole-document finding anchors on. A rule that
+/// reports about the document rather than a passage still needs a span, and it
+/// takes the first character of the payload.
+///
+/// The first character can be several bytes wide. A hardcoded `0..1` cuts into
+/// an emoji, an em dash, or an accented letter, and a span that lands inside a
+/// character fails the span invariant, so the whole run exits 30 instead of
+/// reporting. An empty payload anchors on the empty span.
+pub(crate) fn document_anchor(text: &str) -> std::ops::Range<usize> {
+    0..text.chars().next().map_or(0, char::len_utf8)
+}
+
 /// Every `(rule id, param key)` the implementation actually reads — or whose
 /// behavior it implements with the policy value hardcoded (noted inline).
 /// The policy-CI param-coverage gate fails when policy.toml declares a param
@@ -107,6 +119,9 @@ pub fn implemented_param_keys() -> &'static [(&'static str, &'static str)] {
         ("SLOP-C010", "negation_window_tokens"),
         ("SLOP-C010", "verb_window_tokens"),
         ("SLOP-C010", "min_clauses"),
+        // Read in engine::accept_word_hit, beside the whole-rule block-start
+        // position, so part of one lexicon can be anchored.
+        ("SLOP-V002", "block_start_only"),
         ("SLOP-F004", "design_markers"),
         ("SLOP-F004", "reception_markers"),
         ("SLOP-E003", "list_items_with_leading_bold_label"),

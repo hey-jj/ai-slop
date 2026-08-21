@@ -1,6 +1,6 @@
 [package]
 name = "ai-slop"
-version = "0.1.9"
+version = "0.1.10"
 edition = "2021"
 rust-version = "1.85"
 license = "MIT OR Apache-2.0"
@@ -12,8 +12,12 @@ repository = "https://github.com/hey-jj/ai-slop"
 include = [
     "src/**",
     "policy/**",
+    "skills/**",
+    "tests/**",
+    "fixtures/**",
     "Cargo.toml",
     "README.md",
+    "CHANGELOG.md",
     "LICENSE-MIT",
     "LICENSE-APACHE",
 ]

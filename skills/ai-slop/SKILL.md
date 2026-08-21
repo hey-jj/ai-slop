@@ -73,6 +73,10 @@ ai-slop check [--profile <P>] [--format <F>] [--suggest] [--waivers <FILE>]
               [--config <FILE>] [--max-bytes <N>] [--output json] [PATH | -]
 ```
 
+Match the format to the document. Reading a markdown file as `text` treats
+fenced code, tables, and link targets as prose, which inflates the duplication
+and punctuation findings and wastes the adjudication.
+
 `--profile` is required. `--format` accepts `markdown`, `text`, `commit`, or
 `manifest`, subject to the selected profile. The profile supplies the format when the
 flag is absent. `--output` accepts only `json`. `--suggest` adds mechanical suggestions
@@ -292,11 +296,16 @@ apophasis) shows up in eight recurring shapes. Name the shape before ruling:
    the pragmatic judgment that decides shapes 1-5.
 7. Staged concession mid-paragraph: a sentence-start `While X, Y` (or
    `Although`, `Though`) opening inside a paragraph. `SLOP-C004` catches the
-   line-start form. The mid-paragraph form stays hand-read for the same
-   budget reason as the single-token metaphors: a 958-file corpus probe put
-   most machine-caught sentence-start hits on temporal `while` and on
-   legitimate human contrasts. Read it with shape 6's question: who raised
-   the conceded point?
+   line-start form, minus two `while` shapes that name a stretch of time and
+   come to you instead: a clause opening on an `-ing` word with no auxiliary
+   verb before the comma (`While reviewing the diff, ...`), unless that
+   participle concedes (`acknowledging`, `recognizing`, `granting`,
+   `accepting`, `conceding`, `admitting`, `noting`, `allowing`), and a clause
+   carrying a progressive (`While you are working, ...`). The mid-paragraph
+   form stays hand-read for the same budget reason as the single-token
+   metaphors: a 958-file corpus probe put most machine-caught sentence-start
+   hits on temporal `while` and on legitimate human contrasts. Read it with
+   shape 6's question: who raised the conceded point?
 8. The proleptic capability-denial stack: a denial of something the artifact
    was never accused of, usually stacked on a restatement of what it does and
    an evidential hedge over the denial (`It reads text. It does not detect
