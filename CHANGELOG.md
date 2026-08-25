@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.1.11] - 2026-08-24
+
+### Added
+
+- A `public-comment` profile for public PR and issue comments. It carries
+  the outbound discipline of `public-bug-report` without the title
+  contract, since a comment has no title and SLOP-K001 reads its first
+  line as one. Policy 1.6.0 to 1.7.0.
+
+### Changed
+
+- `Rule::profile_mask` returns `u16` instead of `u8`. The ninth profile
+  sits at bit index 8, past the top of a `u8`. The change lands in a
+  public signature. No external consumer of it is known.
+
 ## [0.1.10] - 2026-08-20
 
 ### Changed

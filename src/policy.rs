@@ -286,8 +286,8 @@ impl Rule {
     }
 
     /// Active-profile bitmask, one bit per profile in package order.
-    pub fn profile_mask(&self) -> u8 {
-        let mut mask = 0u8;
+    pub fn profile_mask(&self) -> u16 {
+        let mut mask = 0u16;
         for (i, fs) in self.stances.iter().enumerate() {
             if fs.any_active() {
                 mask |= 1 << i;
@@ -555,9 +555,9 @@ pub fn load() -> Result<PolicyPackage, String> {
         .iter()
         .map(|v| as_str(v, "profile_names entry"))
         .collect::<Result<Vec<_>, _>>()?;
-    if profile_names.len() != 8 {
+    if profile_names.len() != 9 {
         return Err(format!(
-            "expected 8 profiles, found {}",
+            "expected 9 profiles, found {}",
             profile_names.len()
         ));
     }
@@ -737,7 +737,7 @@ pub fn load() -> Result<PolicyPackage, String> {
             Some(v) => parse_field_stance(v, &format!("rule {id} profiles.default"))?,
             None => FieldStance::uniform(Stance::Apply),
         };
-        let mut stances = vec![default_stance; 8];
+        let mut stances = vec![default_stance; profile_names.len()];
         for (k, v) in profiles_val {
             if k == "default" {
                 continue;
@@ -846,7 +846,7 @@ mod profile_exemption_tests {
     fn absent_table_yields_empty_lists() {
         let rt = rule_table(r#"id = "SLOP-TEST""#);
         let out = parse_profile_exemptions(&rt, &names(), "SLOP-TEST").unwrap();
-        assert_eq!(out.len(), 8);
+        assert_eq!(out.len(), 9);
         assert!(out.iter().all(|l| l.is_empty()));
     }
 

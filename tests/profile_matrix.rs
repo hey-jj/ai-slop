@@ -152,6 +152,33 @@ fn known_matrix_points() {
         rule("SLOP-F004").stance(Profile::InternalDoc, Field::Whole),
         Stance::Off
     );
+    // v0.1.11: public-comment mirrors public-bug-report minus the title
+    // contract. K001 stays off (a comment has no title); the outbound
+    // discipline rules apply.
+    assert_eq!(
+        rule("SLOP-S002").stance(Profile::PublicComment, Field::Whole),
+        Stance::Apply
+    );
+    assert_eq!(
+        rule("SLOP-I002").stance(Profile::PublicComment, Field::Whole),
+        Stance::Apply
+    );
+    assert_eq!(
+        rule("SLOP-X001").stance(Profile::PublicComment, Field::Whole),
+        Stance::Apply
+    );
+    assert_eq!(
+        rule("SLOP-X003").stance(Profile::PublicComment, Field::Whole),
+        Stance::Apply
+    );
+    assert_eq!(
+        rule("SLOP-K001").stance(Profile::PublicComment, Field::Whole),
+        Stance::Off
+    );
+    assert_eq!(
+        rule("SLOP-X004").stance(Profile::PublicComment, Field::Whole),
+        Stance::Apply
+    );
 }
 
 #[test]

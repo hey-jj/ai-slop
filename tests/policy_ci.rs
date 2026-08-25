@@ -37,7 +37,7 @@ fn every_rule_has_guard_tier_lifecycle_and_profiles() {
     let pkg = policy::load().unwrap();
     for rule in &pkg.rules {
         assert!(!rule.guard.is_empty(), "{} missing guard", rule.id);
-        assert_eq!(rule.stances.len(), 8, "{} stances", rule.id);
+        assert_eq!(rule.stances.len(), 9, "{} stances", rule.id);
         if rule.tier == policy::Tier::Candidate {
             assert!(rule.judge.is_some(), "{} missing judge question", rule.id);
         }

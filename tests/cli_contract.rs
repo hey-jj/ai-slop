@@ -48,6 +48,18 @@ fn clean_doc_exits_zero_with_pure_json_stdout() {
 }
 
 #[test]
+fn public_comment_profile_is_accepted() {
+    let (code, stdout, _) = run_stdin(
+        &["check", "--profile", "public-comment", "-"],
+        b"The retry loop reads the deadline before the first attempt.\n",
+    );
+    assert_eq!(code, 0, "stdout: {stdout}");
+    let v: serde_json::Value = serde_json::from_str(stdout.trim()).expect("stdout is JSON");
+    assert_eq!(v["result_state"], "no_findings");
+    assert_eq!(v["artifact"]["profile"], "public-comment");
+}
+
+#[test]
 fn violation_exits_10_candidate_exits_20() {
     let (code, stdout, _) = run_stdin(
         &["check", "--profile", "internal-doc", "-"],

@@ -35,8 +35,8 @@ recognize as a failure.
 
 ## Profiles
 
-Each check requires one of eight profiles:
-`public-bug-report`, `commit-message`, `changelog`,
+Each check requires one of nine profiles:
+`public-bug-report`, `public-comment`, `commit-message`, `changelog`,
 `release-notes`, `readme`, `api-docs`, `cargo-metadata`, `internal-doc`.
 
 ## Segmentation

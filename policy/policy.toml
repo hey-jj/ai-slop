@@ -3,7 +3,7 @@
 # names. Lexicon files under words/ are canonical data referenced by rule ID.
 
 [policy]
-version = "1.6.0"
+version = "1.7.0"
 # sha256 over the canonical serialization of the whole package (sorted keys,
 # LF endings, sorted file list), computed with this field set to the empty
 # string. The build embeds the computed value in every result and snapshot.
@@ -43,6 +43,7 @@ quotation_suppress = ["SLOP-A005"]
 profile_names = [
   "public-bug-report", "commit-message", "changelog", "release-notes",
   "readme", "api-docs", "cargo-metadata", "internal-doc",
+  "public-comment",
 ]
 
 # Core-rule stance per profile, consumed by the skill snapshot. Values:
@@ -89,6 +90,11 @@ notes = "Package description, keywords, categories. Field rules in SLOP-K006."
 format = "markdown"
 core_rules = { rule1 = "off", rule2 = "off", rule3 = "off", rule4 = "apply" }
 notes = "Playbooks, runbooks, status ledgers. Naming models, paths, and process is the content. Style rules stay on. The scrub family is off."
+
+[profile.public-comment]
+format = "markdown"
+core_rules = { rule1 = "apply", rule2 = "apply", rule3 = "apply", rule4 = "apply" }
+notes = "Public PR or issue comment. Same outbound discipline as public-bug-report, minus the title contract (a comment has no title)."
 
 # ---------------------------------------------------------------------------
 # Family A: ornamental lexicon
@@ -360,7 +366,7 @@ view = "prose"
 match = { kind = "regex-set", scope = "heading" }
 patterns = ['(?i)^(impact|severity|risk|recommended fix|recommendation|conclusion)s?\b']
 guard = "Headings only. The bug-report profile bans verdict headings because they draw the conclusion for the maintainer. Other profiles allow these headings and the rule is off there."
-profiles = { default = "off", public-bug-report = "apply" }
+profiles = { default = "off", public-bug-report = "apply", public-comment = "apply" }
 
 [[rule]]
 id = "SLOP-S003"
@@ -520,7 +526,7 @@ origin = "harvest"
 view = "norm"
 match = { kind = "word-set", lexicon = "words/importance-adjectives.txt", case = "insensitive", boundary = "word" }
 guard = "Exempt in fixed technical senses: critical section, critical path, significant figures, statistical significance reported with the test and effect size, and severity labels quoted from an external taxonomy. Elsewhere the word ranks the claim instead of stating the consequence."
-profiles = { default = "relax", public-bug-report = "apply" }
+profiles = { default = "relax", public-bug-report = "apply", public-comment = "apply" }
 [rule.exemptions]
 critical = ["critical section", "critical sections", "critical path", "critical paths"]
 significant = ["significant figures", "statistically significant"]
@@ -1015,7 +1021,7 @@ view = "prose"
 match = { kind = "structural", params = { heading_set = ["summary", "overview", "key changes", "changes", "benefits", "test plan", "testing", "next steps"], min_matches = 3 } }
 guard = "A repo template that mandates these sections passes when the template is in the repo. The trigger is the stock chat-output heading skeleton. Checkmark bullets are caught independently by SLOP-M006 emoji-in-prose (this rule declares no checkmark_bullets param of its own)."
 judge = "Is this the project's template or the tool's?"
-profiles = { default = "off", public-bug-report = "apply", readme = "relax" }
+profiles = { default = "off", public-bug-report = "apply", readme = "relax", public-comment = "apply" }
 
 [[rule]]
 id = "SLOP-X002"
@@ -1038,10 +1044,10 @@ tier = "candidate"
 lifecycle = "experimental"
 origin = "research"
 view = "prose"
-match = { kind = "ratio", params = { max_words = { public-bug-report = 1200, commit-message = 300, changelog = 2000 } } }
+match = { kind = "ratio", params = { max_words = { public-bug-report = 1200, commit-message = 300, changelog = 2000, public-comment = 600 } } }
 guard = "Long documents are sometimes necessary. The signal is length combined with the other density families, so this rule reports and defers to the judge."
 judge = "Is the length carrying content or volume?"
-profiles = { default = "off", public-bug-report = "apply", commit-message = "apply" }
+profiles = { default = "off", public-bug-report = "apply", commit-message = "apply", public-comment = "apply" }
 
 [[rule]]
 id = "SLOP-X004"

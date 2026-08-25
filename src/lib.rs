@@ -34,10 +34,11 @@ pub enum Profile {
     ApiDocs,
     CargoMetadata,
     InternalDoc,
+    PublicComment,
 }
 
 impl Profile {
-    pub const ALL: [Profile; 8] = [
+    pub const ALL: [Profile; 9] = [
         Profile::PublicBugReport,
         Profile::CommitMessage,
         Profile::Changelog,
@@ -46,6 +47,7 @@ impl Profile {
         Profile::ApiDocs,
         Profile::CargoMetadata,
         Profile::InternalDoc,
+        Profile::PublicComment,
     ];
 
     pub fn as_str(self) -> &'static str {
@@ -58,6 +60,7 @@ impl Profile {
             Profile::ApiDocs => "api-docs",
             Profile::CargoMetadata => "cargo-metadata",
             Profile::InternalDoc => "internal-doc",
+            Profile::PublicComment => "public-comment",
         }
     }
 

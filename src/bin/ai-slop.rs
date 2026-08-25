@@ -86,7 +86,7 @@ fn usage() -> &'static str {
      \n\
      profiles (--profile, required, no default):\n  \
      public-bug-report, commit-message, changelog, release-notes, readme,\n  \
-     api-docs, cargo-metadata, internal-doc\n\
+     api-docs, cargo-metadata, internal-doc, public-comment\n\
      \n\
      formats (--format, defaults to the profile's declared format):\n  \
      markdown, text, commit, manifest\n  \

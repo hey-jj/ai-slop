@@ -44,11 +44,12 @@ Two questions to put to your own draft on that last reread:
 
 ## Profiles
 
-The caller declares exactly one of eight profiles on every run.
+The caller declares exactly one of nine profiles on every run.
 
 | Artifact | Profile |
 |---|---|
-| Bug report, issue text, PR text | `public-bug-report` |
+| Bug report, opening body of an issue or PR | `public-bug-report` |
+| Comment on an issue or PR (a reply in a thread) | `public-comment` |
 | Commit message | `commit-message` |
 | Changelog entry | `changelog` |
 | Release notes | `release-notes` |
@@ -56,6 +57,10 @@ The caller declares exactly one of eight profiles on every run.
 | Rustdoc, doc comments | `api-docs` |
 | Package description, keywords | `cargo-metadata` |
 | Playbook, runbook, status doc | `internal-doc` |
+
+The discriminator between the two issue/PR profiles is whether the text owns a
+title field: a titled opening body uses `public-bug-report`, a titleless thread
+comment uses `public-comment`.
 
 For an unlisted artifact, use the nearest listed type and state which profile you chose.
 
