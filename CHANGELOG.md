@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.1.12] - 2026-09-02
+
+### Changed
+
+- The bare word `impact` leaves the SLOP-F003 lexicon. The rule matches by
+  substring, so the entry fired on `impacted`, `impacts`, and every neutral
+  sentence that names what a change reaches, which the guard itself files as
+  content. The entries that rank a consequence stay, `high-impact` among
+  them, and a keep-test reads the lexicon and proves each one still fires.
+  The literal `Impact` heading on the bug-report profile is still a SLOP-S002
+  verdict heading. Policy 1.7.0 to 1.8.0.
+
 ## [0.1.11] - 2026-08-24
 
 ### Added

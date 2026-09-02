@@ -122,12 +122,12 @@ fn profile_exemptions_round_trip_and_digest() {
             );
         }
     }
-    assert_eq!(pkg.version, "1.7.0");
+    assert_eq!(pkg.version, "1.8.0");
     assert_eq!(pkg.digest, policy::compute_digest());
     let cp = ai_slop::engine::compiled().unwrap();
     let snapshot = ai_slop::skill::generate(&cp.pkg);
     assert!(snapshot.contains(&pkg.digest));
-    assert!(snapshot.contains("policy version: 1.7.0"));
+    assert!(snapshot.contains("policy version: 1.8.0"));
 }
 
 // --- P2: SLOP-X004 house-report-template exemption --------------------------

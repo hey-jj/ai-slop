@@ -3,7 +3,6 @@ severe
 severity
 urgent
 urgently
-impact
 high-impact
 critical vulnerability
 the only fix
