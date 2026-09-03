@@ -41,6 +41,9 @@ Two questions to put to your own draft on that last reread:
   does instead.
 - Does a sentence explain why the design is right? Say what happens and what to do
   about it, and move the reasoning to the build log.
+- Does a sentence credit a decision to the owner, the maintainer, or the user in the
+  third person? The writer is that person. State the fact the decision produced and
+  drop the attribution.
 
 ## Profiles
 
@@ -278,6 +281,33 @@ reread found all three classes.
    rule-caught by `SLOP-A005`. The single tokens stay hand-read for good:
    measured corpora put 85 to 93 percent of single-token hits on genuine
    terms of art, so a rule there cannot hold the false-positive budget.
+7. Decision attribution. A sentence that credits a decision to a role noun in
+   the third person, in text the person named by that noun is signing:
+   `Owner's ruling, 2026-08-20: the profile stays.`, `the maintainer's call`,
+   `requested by the user`, `owner-flagged`, `owner decision`, `per the
+   owner`, `at the user's request`, `the owner wants`, `the owner has ruled`,
+   `in the owner's stead`, `as you directed`, and a block-start `Ruling:` or
+   `Decision (2026-08-20):` label. Rule-caught (`SLOP-V006`) over two closed
+   role sets: the open roles (owner, maintainer, author, principal, proxy,
+   operator, orchestrator, human, lead, user, reviewer) take the verdict
+   forms, and the ledger roles (owner, maintainer, principal, proxy,
+   orchestrator, lead) also take the loose verbs and possessives, since those
+   are the nouns an agent uses for the person it works for. The shape enters
+   through an agent that drafts in the owner's name and records where the
+   choice came from, and the date beside it is a ledger row. The person the
+   noun names is the writer, so the sentence reports the writer in the third
+   person, which no one does in their own issue or README. Wrong: `Owner's
+   ruling, 2026-08-20: the bare word leaves the lexicon.` Right: `The bare
+   word leaves the lexicon.` When the noun names somebody else, name them and
+   quote what they said. The rule fires on ordinary English too, since `the
+   author decides` in a book review and `the user approves` in an OAuth flow,
+   and the judge question settles each one by asking who the noun names in
+   this draft. Two spellings stay hand-read because they are ordinary bug
+   report prose: `the user asked` and `the author said`. A pronoun for the
+   owner (`he decided`, `her call`) is the same shape with the noun removed
+   and stays hand-read. Never instruct a
+   reviewer to read one of these as an attributed decision and pass it. That
+   instruction is how the specimen shipped.
 
 ### Contrastive negation: the eight shapes
 

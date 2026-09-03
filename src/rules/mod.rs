@@ -44,6 +44,7 @@ pub const ENGINE_RULES: &[&str] = &[
     "SLOP-V003",
     "SLOP-V004",
     "SLOP-V005",
+    "SLOP-V006",
     "SLOP-T001",
     "SLOP-T002",
     "SLOP-T003",
