@@ -1,5 +1,6 @@
 # SLOP-F003 impact and verdict framing. Candidate tier.
 severe
+severely
 severity
 urgent
 urgently

@@ -44,6 +44,9 @@ Two questions to put to your own draft on that last reread:
 - Does a sentence credit a decision to the owner, the maintainer, or the user in the
   third person? The writer is that person. State the fact the decision produced and
   drop the attribution.
+- Does a sentence hedge through a negation, `no small feat`, `not uncommon`, `not
+  entirely clear`? State the claim, or give the number or the gap that makes the
+  negation literal.
 
 ## Profiles
 
@@ -308,6 +311,40 @@ reread found all three classes.
    and stays hand-read. Never instruct a
    reviewer to read one of these as an attributed decision and pass it. That
    instruction is how the specimen shipped.
+8. Hedging litotes and deliberate understatement. A claim carried by the
+   negation of its opposite, or a stock understatement in place of the
+   verdict: `no small feat`, `not without its challenges`, `far from trivial`,
+   `hardly surprising`, `not exactly simple`, `leaves something to be
+   desired`, `to say the least`, `not uncommon`, `not entirely clear`, `less
+   than ideal`, `not the best`. Rule-caught over two closed sets. The fixed
+   forms are `SLOP-I006`, a violation with no judge question, since no member
+   has an honest reading in confident technical prose. The measurable forms
+   are `SLOP-I007`, a candidate whose judge question asks for the count, rate,
+   rank, or named gap that makes the negation literal. The house states an
+   opinion as a verdict and states uncertainty as a fact: we know X, or we do
+   not know X. Wrong: `It is not entirely clear why the test flakes.` Right:
+   `We do not know why the test flakes.` Wrong: `Migrating the schema was no
+   simple task.` Right: `Migrating the schema took three passes over the enum
+   tables.` Honest negations stay silent under both rules and stay honest on
+   the reread: `not impossible` in a proof, `not unlike` in a comparison,
+   `not incorrect` in a code review, `not yet`, `not always`, `not all`, and a
+   bare `far from` or `hardly`. A hedging negation the two lists miss is the
+   same shape and is hand-read.
+
+### Litotes rewrites
+
+| Wrong | Right |
+|---|---|
+| `not uncommon` | `common`, or the measured rate |
+| `no simple task` | name the hard steps |
+| `not without its challenges` | name the failures or costs |
+| `not entirely clear` | `We do not know X.` |
+| `far from trivial` | name the affected components |
+| `hardly surprising` | `We expected this.` |
+| `less than ideal` | name the defect |
+| `it would not be wrong to say` | state the claim |
+| `leaves something to be desired` | name the defect |
+| `not the best` | give the rank |
 
 ### Contrastive negation: the eight shapes
 

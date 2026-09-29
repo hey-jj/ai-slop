@@ -32,7 +32,7 @@ fn f003_lexicon_drops_bare_impact_and_keeps_high_impact() {
         f003.terms.iter().any(|t| t == "high-impact"),
         "high-impact left the F003 lexicon with the bare word"
     );
-    assert_eq!(f003.terms.len(), 25, "the F003 lexicon carries 25 entries");
+    assert_eq!(f003.terms.len(), 26, "the F003 lexicon carries 26 entries");
 }
 
 // --- keep-tests: every surviving entry still fires ---------------------------
@@ -114,4 +114,33 @@ fn f003_impact_heading_is_left_to_s002() {
         .expect("S002 keeps the verdict heading");
     assert_eq!(common::snippet(s002), "Impact");
     assert_eq!(s002.state, "violation");
+}
+
+// --- word edges ------------------------------------------------------------
+
+/// Every entry matches on word edges, and a hyphen is a word edge, so the
+/// negated and mechanism compounds carry their own exemptions. The plain
+/// entries and the adverb keep firing.
+#[test]
+fn f003_matches_on_word_edges() {
+    for t in [
+        "The retry loop must persevere through the outage.\n",
+        "The non-urgent queue drains nightly.\n",
+        "The fault is non-severe and logged.\n",
+        "The bug is unexploitable on 64-bit builds.\n",
+        "The bug is non-exploitable on 64-bit builds.\n",
+        "Self-remediation runs after the alert.\n",
+        "Auto-remediation runs after the alert.\n",
+    ] {
+        assert!(!f003_fires(t), "F003 fired inside a compound: {t:?}");
+    }
+    for t in [
+        "The outage is severe for every caller.\n",
+        "The parser is severely broken on this input.\n",
+        "This is urgent for every caller.\n",
+        "The bug is exploitable from the network.\n",
+        "Remediation is a one-line change.\n",
+    ] {
+        assert!(f003_fires(t), "F003 went silent: {t:?}");
+    }
 }

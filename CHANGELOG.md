@@ -1,5 +1,68 @@
 # Changelog
 
+## [0.1.14] - 2026-09-29
+
+### Added
+
+- SLOP-I006 `hedging-litotes`, a violation in the intensifier family with no
+  judge question. It reports the closed set of hedging litotes and stock
+  understatements that have no honest reading in confident technical prose:
+  the negated adjectives behind `not` (`not inconsiderable`, `not
+  unimportant`, `not inconsequential`, `not unfamiliar`), the negated
+  difficulty forms (`no small feat`, `no mean feat`, `in no small part`, `was
+  no simple task`), the negated privations (`not without its challenges`),
+  the partial negations on an ease word (`not exactly trivial`, `isn't
+  exactly simple`), the distance forms (`far from trivial`,
+  `hardly surprising`, `less than stellar`, `leaves something to be
+  desired`), the conditional frames (`it would not be wrong to say`, `it is
+  safe to say`, `it is not hard to see`), and the stock understatements (`to
+  say the least`, `to put it mildly`, `not rocket science`, `not a walk in
+  the park`, `not for the faint of heart`, `not to be underestimated`, a
+  comma-led `not to mention`). Every not-led member also takes the
+  contractions `isn't`, `wasn't`, `aren't`, and `weren't`. Every adjective is listed and no prefix
+  wildcard exists, so `not impossible`, `not unlike`, `not incorrect`, `not
+  necessarily`, `not yet`, a bare `far from`, and a bare `hardly` stay
+  silent. A clause-initial `No simple task` is a quantifier and stays silent.
+  The span is the phrase itself. The rule applies at violation tier in every
+  profile, internal-doc included, and quoted text downgrades to candidate.
+  `it goes without saying` stays with SLOP-T001.
+- SLOP-I007 `understatement-hedge`, a candidate in the intensifier family.
+  It reports the understatements that can carry a literal count, rate,
+  threshold, rank, or evidence gap: `not uncommon` and eleven other negated
+  adjectives, `not unheard of`, `not infrequently`, `not a trivial
+  undertaking`, `no small amount`, `not without merit`, `not entirely clear`,
+  `not exactly ideal`, `not quite right`, `not particularly`, `not terribly`,
+  `far from ideal`, `less than ideal`, `it is not unreasonable to`, `not the best`,
+  `could be better`, and `room for improvement`, with the same four
+  contractions on every not-led member. The judge question asks for
+  the number or the named gap that makes the negation literal. internal-doc
+  relaxes to advisory, and quoted text drops. Policy 1.9.0 to 1.10.0.
+- The skill gains the shape as hand-read tell 8, a fourth closing question
+  for the final reread, and a table of direct rewrites.
+
+### Fixed
+
+- SLOP-F002 `verification-claim` matched `re-verified` as a substring inside
+  `signature-verified`, so a README line saying that capture claims are read
+  and never signature-verified failed the gate. Every entry now matches on
+  word edges, which also silences `unverified` and `unconfirmed`, and a
+  hyphen compound ending in `verified` or `confirmed` names a mechanism and
+  stays silent. The plain claims (`verified`, `confirmed by`,
+  `double-checked`, `was reviewed`) fire as before.
+- SLOP-F003 `impact-framing` had the same substring collision: `severe`
+  fired inside `persevere`, and the negated compounds `non-urgent`,
+  `non-severe`, `unexploitable`, and `non-exploitable` fired on the word they
+  negate. Every entry now matches on word edges, the negated compounds and
+  the mechanism compounds `self-remediation` and `auto-remediation` carry
+  exemptions, and `severely` joins the lexicon so the adverb keeps firing.
+- SLOP-K008 `guarantee-claim` fired on the claim a negated compound denies:
+  `non-guaranteed`, `non-thread-safe`, `non-lock-free`. Every entry now
+  matches on word edges and the negated compounds carry exemptions.
+- SLOP-T003 `audience-runway` fired on `mastering` inside `remastering` and
+  `re-mastering`. Every entry now matches on word edges, `re-mastering`
+  carries an exemption, and `demystifies` and `demystified` join the lexicon
+  so the verb keeps firing in every form.
+
 ## [0.1.13] - 2026-09-02
 
 ### Added
