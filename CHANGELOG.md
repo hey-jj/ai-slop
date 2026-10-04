@@ -1,5 +1,53 @@
 # Changelog
 
+## [0.1.16] - 2026-10-04
+
+### Changed
+
+- Policy version 1.11.0. An exemption phrase may now carry `\b` at either end.
+  A leading `\b` makes the phrase open on a word edge, so `\bform i` covers
+  `direct form I` and never covers `platform I`. A trailing `\b` makes it
+  close on a word edge, so `upstream ref\b` never covers `upstream reference`.
+  A phrase without a marker still matches inside a longer token, so `cpu
+  utilization` covers `vCPU utilization` as before. A space in a phrase now
+  matches a line wrap, where a line break is `\n`, a bare `\r`, or `\r\n`. A
+  blank line, a new list item, or the end of a heading still ends the match,
+  whether or not a blank line follows the heading.
+- SLOP-A001 `ornamental-lexicon` reads a capitalized term one space after
+  another capitalized word mid-sentence as part of a product name. The match
+  parameter `proper_noun_compound` turns this on. A function word, an
+  imperative opener such as `Experience` or `Deliver`, or another term from
+  the list in front of it keeps the finding, and a hyphenated word such as
+  `World-Class` counts whole, so `The Bedrock of Our Approach`, `Unlock
+  Seamless Workflows`, and `Experience Seamless Integration` still fire. A
+  line wrap between the two words keeps the exemption.
+- SLOP-J001 `injection-pattern` drops `system prompt` from its lexicon.
+  ai-slop gates outbound text, where the phrase is API vocabulary. The begin
+  and end marker entries and every other entry still fire.
+
+### Fixed
+
+- SLOP-I002 `importance-inflation` no longer fires on `most significant bit`
+  or `least significant byte`. The exemption covers `most significant` and
+  `least significant` before bit, byte, digit, or nibble, in space or hyphen
+  spelling. `a significant improvement` and `the most significant bitmap`
+  still fire.
+- SLOP-F001 `first-person-marker` no longer fires on the Roman numeral in
+  `direct form I`, `type I error`, `Class I`, or `Phase I`. The exemption
+  covers a lone `I` after form, type, class, phase, part, stage, tier, level,
+  mode, or group. `I verified this` and `I ran the tests` still fire.
+- SLOP-A001 no longer fires on `Amazon Bedrock`, `Atlassian Crucible`,
+  `Sonatype Nexus`, `Samsung Vibrant`, or `Super Mario Odyssey`. `the bedrock
+  of our approach` still fires.
+- SLOP-J001 no longer fires on `The system prompt sets the role.`
+- SLOP-A003 `current-model-overuse` no longer fires on `syntax highlighting`,
+  in any capitalization and in space or hyphen spelling. `highlighting the
+  importance of` still fires.
+- SLOP-W001 `scrub-words` no longer fires on `upstream` as git vocabulary:
+  next to tracking, branch, remote, or ref, and in `set-upstream`,
+  `--set-upstream-to`, `--unset-upstream`, and `@{upstream}`. `the upstream
+  library` and `ported from upstream` still fire.
+
 ## [0.1.15] - 2026-10-03
 
 ### Documentation

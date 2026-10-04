@@ -402,9 +402,9 @@ fn c007_noun_tails_and_the_deny_list_keep_firing() {
 
 /// The round changed rule text and patterns, so the policy version moves.
 #[test]
-fn policy_version_is_1_10_0() {
+fn policy_version_is_1_11_0() {
     let cp = ai_slop::engine::compiled().expect("policy compiles");
-    assert_eq!(cp.pkg.version, "1.10.0");
+    assert_eq!(cp.pkg.version, "1.11.0");
 }
 
 // --- SLOP-V002 block-start anchoring and the emoji run -----------------------

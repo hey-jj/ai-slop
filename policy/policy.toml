@@ -3,7 +3,7 @@
 # names. Lexicon files under words/ are canonical data referenced by rule ID.
 
 [policy]
-version = "1.10.0"
+version = "1.11.0"
 # sha256 over the canonical serialization of the whole package (sorted keys,
 # LF endings, sorted file list), computed with this field set to the empty
 # string. The build embeds the computed value in every result and snapshot.
@@ -109,8 +109,8 @@ lifecycle = "blocking"
 origin = "owner-mandate"
 waiver = "human-only"
 view = "norm"
-match = { kind = "word-set", lexicon = "words/ornamental.txt", case = "insensitive", boundary = "word" }
-guard = "Prose only. Code spans, fences, link URLs, and identifiers are excluded by segmentation. Known collisions with technical senses (a lock being unlocked, privilege elevation, financial leverage as a noun, robust statistics) go through the human waiver path, not an exemption."
+match = { kind = "word-set", lexicon = "words/ornamental.txt", case = "insensitive", boundary = "word", params = { proper_noun_compound = true } }
+guard = "Prose only. Code spans, fences, link URLs, and identifiers are excluded by segmentation. A capitalized term one space after another capitalized word mid-sentence is part of a product name such as Amazon Bedrock and is exempt, unless that word is a function word, an imperative opener of marketing copy such as Experience or Deliver, or a term on this list. A hyphenated word counts whole, so World-Class Seamless still fires. Known collisions with technical senses (a lock being unlocked, privilege elevation, financial leverage as a noun, robust statistics) go through the human waiver path, not an exemption."
 profiles = { default = "apply" }
 
 [[rule]]
@@ -145,9 +145,11 @@ lifecycle = "blocking"
 origin = "research"
 view = "norm"
 match = { kind = "word-set", lexicon = "words/era-overuse.txt", case = "insensitive", boundary = "word" }
-guard = "Exempt when the object is a concrete typographic or UI action (highlighting text in an editor, a showcase application as a proper noun) or, for load-bearing, literal structural engineering. Enhance passes when the changed metric and baseline are named."
+guard = "Exempt when the object is a concrete typographic or UI action (highlighting text in an editor, a showcase application as a proper noun) or, for load-bearing, literal structural engineering. Syntax highlighting, in space or hyphen spelling, is exempt through [rule.exemptions]. Enhance passes when the changed metric and baseline are named."
 judge = "Is the word doing work a plain verb would do, or naming a concrete measured change?"
 profiles = { default = "apply" }
+[rule.exemptions]
+highlighting = ['\bsyntax highlighting', '\bsyntax-highlighting']
 
 [[rule]]
 id = "SLOP-A004"
@@ -558,11 +560,11 @@ lifecycle = "blocking"
 origin = "harvest"
 view = "norm"
 match = { kind = "word-set", lexicon = "words/importance-adjectives.txt", case = "insensitive", boundary = "word" }
-guard = "Exempt in fixed technical senses: critical section, critical path, significant figures, statistical significance reported with the test and effect size, and severity labels quoted from an external taxonomy. Elsewhere the word ranks the claim instead of stating the consequence."
+guard = "Exempt in fixed technical senses: critical section, critical path, significant figures, most or least significant bit, byte, digit, or nibble in space or hyphen spelling, statistical significance reported with the test and effect size, and severity labels quoted from an external taxonomy. Elsewhere the word ranks the claim instead of stating the consequence."
 profiles = { default = "relax", public-bug-report = "apply", public-comment = "apply" }
 [rule.exemptions]
 critical = ["critical section", "critical sections", "critical path", "critical paths"]
-significant = ["significant figures", "statistically significant"]
+significant = ["significant figures", "statistically significant", '\bmost significant bit\b', '\bmost significant bits\b', '\bmost-significant bit\b', '\bmost-significant bits\b', '\bmost-significant-bit\b', '\bmost-significant-bits\b', '\bmost significant-bit\b', '\bmost significant-bits\b', '\bmost significant byte\b', '\bmost significant bytes\b', '\bmost-significant byte\b', '\bmost-significant bytes\b', '\bmost-significant-byte\b', '\bmost-significant-bytes\b', '\bmost significant-byte\b', '\bmost significant-bytes\b', '\bmost significant digit\b', '\bmost significant digits\b', '\bmost-significant digit\b', '\bmost-significant digits\b', '\bmost-significant-digit\b', '\bmost-significant-digits\b', '\bmost significant-digit\b', '\bmost significant-digits\b', '\bmost significant nibble\b', '\bmost significant nibbles\b', '\bmost-significant nibble\b', '\bmost-significant nibbles\b', '\bmost-significant-nibble\b', '\bmost-significant-nibbles\b', '\bmost significant-nibble\b', '\bmost significant-nibbles\b', '\bleast significant bit\b', '\bleast significant bits\b', '\bleast-significant bit\b', '\bleast-significant bits\b', '\bleast-significant-bit\b', '\bleast-significant-bits\b', '\bleast significant-bit\b', '\bleast significant-bits\b', '\bleast significant byte\b', '\bleast significant bytes\b', '\bleast-significant byte\b', '\bleast-significant bytes\b', '\bleast-significant-byte\b', '\bleast-significant-bytes\b', '\bleast significant-byte\b', '\bleast significant-bytes\b', '\bleast significant digit\b', '\bleast significant digits\b', '\bleast-significant digit\b', '\bleast-significant digits\b', '\bleast-significant-digit\b', '\bleast-significant-digits\b', '\bleast significant-digit\b', '\bleast significant-digits\b', '\bleast significant nibble\b', '\bleast significant nibbles\b', '\bleast-significant nibble\b', '\bleast-significant nibbles\b', '\bleast-significant-nibble\b', '\bleast-significant-nibbles\b', '\bleast significant-nibble\b', '\bleast significant-nibbles\b']
 
 [[rule]]
 id = "SLOP-I003"
@@ -916,11 +918,11 @@ lifecycle = "blocking"
 origin = "incident"
 view = "norm"
 match = { kind = "word-set", lexicon = "words/first-person.txt", case = "insensitive", boundary = "word" }
-guard = "The trigger is presence, the rule is core rule 1. Reproduction narration in a bug report can be legitimate. Statements about how we produced or checked the finding are not. The pronoun entry is exempt inside the technical token I/O, where the slash makes both letters word-bounded."
+guard = "The trigger is presence, the rule is core rule 1. Reproduction narration in a bug report can be legitimate. Statements about how we produced or checked the finding are not. The pronoun entry is exempt inside the technical token I/O, where the slash makes both letters word-bounded, and as the Roman numeral directly after form, type, class, phase, part, stage, tier, level, mode, or group (direct form I, type I error)."
 judge = "Core rule 1 test: fact about the subject or fact about us?"
 profiles = { default = "apply", readme = "relax", changelog = "relax", release-notes = "relax", commit-message = "relax", internal-doc = "off" }
 [rule.exemptions]
-i = ["i/o"]
+i = ["i/o", '\bform i', '\btype i', '\bclass i', '\bphase i', '\bpart i', '\bstage i', '\btier i', '\blevel i', '\bmode i', '\bgroup i']
 
 [[rule]]
 id = "SLOP-F002"
@@ -1166,10 +1168,11 @@ lifecycle = "blocking"
 origin = "harvest"
 view = "norm"
 match = { kind = "word-set", lexicon = "words/scrub.txt", case = "insensitive", boundary = "word" }
-guard = "Public-surface profiles only. Port is exempt when adjacent to a number or to serial, network, tcp, udp, listening, or bind, in space or hyphen spelling, and in port-forwarding. Hyphenation never suppresses the rule by itself: research-backed, audit-ready, straight-port, and upstream-first all fire. Only the listed technical compounds are exempt. Terms inside code spans, crate names, and identifiers are excluded by segmentation. The list is deployment policy data."
+guard = "Public-surface profiles only. Port is exempt when adjacent to a number or to serial, network, tcp, udp, listening, or bind, in space or hyphen spelling, and in port-forwarding. Upstream is exempt as git vocabulary when adjacent to tracking, branch, remote, or ref, in space or hyphen spelling, and in set-upstream, --set-upstream-to, --unset-upstream, and @{upstream}. Hyphenation never suppresses the rule by itself: research-backed, audit-ready, straight-port, and upstream-first all fire. Only the listed technical compounds are exempt. Terms inside code spans, crate names, and identifiers are excluded by segmentation. The list is deployment policy data."
 profiles = { default = "apply", internal-doc = "off" }
 [rule.exemptions]
 port = ["port number", "serial port", "network port", "tcp port", "udp port", "listening port", "bind port", "port-number", "serial-port", "network-port", "tcp-port", "udp-port", "listening-port", "bind-port", "port-forwarding", "port 0", "port 1", "port 2", "port 3", "port 4", "port 5", "port 6", "port 7", "port 8", "port 9"]
+upstream = ['\bupstream tracking\b', '\bupstream branch\b', '\bupstream branches\b', '\bupstream remote\b', '\bupstream remotes\b', '\bupstream ref\b', '\bupstream refs\b', '\bupstream-tracking\b', '\bupstream-branch\b', '\bupstream-branches\b', '\bupstream-remote\b', '\bupstream-remotes\b', '\bupstream-ref\b', '\bupstream-refs\b', '\btracking upstream\b', '\bbranch upstream\b', '\bremote upstream\b', '\btracking-upstream\b', '\bbranch-upstream\b', '\bremote-upstream\b', '\bset-upstream\b', '\bunset-upstream\b', "@{upstream}"]
 
 [[rule]]
 id = "SLOP-W002"

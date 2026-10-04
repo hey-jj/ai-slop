@@ -122,6 +122,9 @@ pub fn implemented_param_keys() -> &'static [(&'static str, &'static str)] {
         // Read in engine::accept_word_hit, beside the whole-rule block-start
         // position, so part of one lexicon can be anchored.
         ("SLOP-V002", "block_start_only"),
+        // Read in engine::accept_word_hit after the exemption phrases, so a
+        // capitalized term inside a product name stays silent.
+        ("SLOP-A001", "proper_noun_compound"),
         ("SLOP-F004", "design_markers"),
         ("SLOP-F004", "reception_markers"),
         ("SLOP-E003", "list_items_with_leading_bold_label"),
