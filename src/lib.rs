@@ -1,4 +1,4 @@
-//! Deterministic detector and coverage instrument for generated-text defects
+//! Detect defects in generated text deterministically and report coverage
 //! in outbound technical artifacts.
 //!
 //! The library performs no I/O and no clock reads. `analyze` is a pure
@@ -224,7 +224,7 @@ pub enum Stance {
     Off,
 }
 
-/// Analyze one artifact. Never panics on any input.
+/// Analyze one artifact. No input causes this function to panic.
 pub fn analyze(input: &[u8], config: &Config) -> Result<Report, AnalysisError> {
     validate_config(config)?;
     let compiled = engine::compiled()
@@ -235,7 +235,7 @@ pub fn analyze(input: &[u8], config: &Config) -> Result<Report, AnalysisError> {
     // prose profile draws findings from statement punctuation, not prose (the
     // documented misfire class), so the boundary fails closed instead. The
     // prose/code split is the extractor's own: backtick fences, tilde fences,
-    // and 4-space indented code blocks are all code, never prose.
+    // and 4-space indented code blocks all stay outside prose.
     if matches!(
         prepared.format,
         input::FormatData::Markdown | input::FormatData::Text
@@ -284,7 +284,7 @@ fn validate_config(config: &Config) -> Result<(), AnalysisError> {
     }
     // Waivers are span-bound and expiring. A span-less waiver would
     // blanket every finding of its rule and a non-expiring one would never
-    // lapse, so both are rejected here — the single choke point covering the
+    // lapse, so both are rejected here, the single choke point covering the
     // CLI --waivers path and approval-embedded waivers alike.
     for w in &config.waivers {
         if w.span.is_none() || w.expires.is_none() {

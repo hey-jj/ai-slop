@@ -1,6 +1,6 @@
-//! process-facts family structural rule: SLOP-F004 rationale leak — a
-//! sentence about the artifact that argues for the design instead of telling
-//! the reader what happens and what to do about it.
+//! process-facts family structural rule: SLOP-F004 rationale leak, a
+//! sentence about the artifact that argues for the design. It leaves the
+//! reader without the behavior and action instructions.
 //!
 //! Two marker families carry the shape. Design economics names the bargain
 //! behind a choice (`which is the trade`, `at the cost of`, `by design`).
@@ -29,10 +29,10 @@ use crate::Config;
 
 pub const HANDLED: &[&str] = &["SLOP-F004"];
 
-/// The one tool-noun set, declared on SLOP-C010's policy block and read by
-/// both rules. An empty result means the set went missing from the package,
-/// which leaves this rule silent rather than guessing at a substitute; the
-/// policy CI test pins the set's contents so that cannot ship.
+/// Read the shared tool-noun set from C010's policy block for C010 and F004.
+/// An absent declaration returns an empty set and leaves this rule silent
+/// without guessing a substitute. The policy CI test pins the set's contents
+/// so that an absent set cannot ship.
 pub(crate) fn shared_tool_nouns(cp: &CompiledPolicy) -> Vec<String> {
     cp.pkg
         .rule_by_id("SLOP-C010")

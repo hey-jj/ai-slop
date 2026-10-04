@@ -100,11 +100,9 @@ fn owner_mandated_sets_are_marked() {
     assert!(j.human_only_waiver);
 }
 
-/// One tool-noun set serves both SLOP-C010 and SLOP-F004. It is declared on
-/// C010's block and read there by both rules, so the pin is on the contents
-/// and on the absence of a second declaration. An empty or shrunken set
-/// leaves F004 unanchored and silent, which is why this is a test and not a
-/// comment.
+/// C010 declares the tool-noun set once, and C010 and F004 both read it
+/// there. Check its contents and the absence of a second declaration. An
+/// empty or shrunken set leaves F004 unanchored and silent.
 #[test]
 fn the_shared_tool_noun_set_is_declared_once_and_carries_both_spellings() {
     let pkg = policy::load().unwrap();
@@ -149,7 +147,7 @@ fn the_shared_tool_noun_set_is_declared_once_and_carries_both_spellings() {
 /// against the code-side implemented list plus the explicit disclosures.
 /// Factored out so the synthetic-dead-param test can prove the gate fails.
 fn param_gate_violations(pkg: &policy::PolicyPackage) -> Vec<String> {
-    // (rule id, param key, file that must disclose it) — a declared param may
+    // (rule id, param key, file that must disclose it), a declared param may
     // alternatively be explicitly disclosed as unimplemented. Empty today:
     // the dead params were stripped instead.
     const DISCLOSED: &[(&str, &str, &str)] = &[];
@@ -191,10 +189,10 @@ fn param_gate_violations(pkg: &policy::PolicyPackage) -> Vec<String> {
     out
 }
 
-// A declared-but-dead structural param is how the H003 unusual-scripts
-// silent false negative once shipped — the implemented-symbol check was
-// rule-level only, so a param with no code behind it passed CI. Every
-// declared param needs an implementation mapping or an explicit disclosure.
+// A declared-but-dead H003 unusual-scripts parameter once shipped a silent
+// false negative. The implemented-symbol check covered only rule ids, so a
+// parameter with no code behind it passed CI. Every declared parameter needs
+// an implementation mapping or an explicit disclosure.
 #[test]
 fn every_declared_param_is_implemented_or_disclosed() {
     let pkg = policy::load().unwrap();

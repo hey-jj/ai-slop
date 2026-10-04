@@ -67,9 +67,9 @@ fn verify_rejects_waivers_on_fail_closed_states_from_any_signer() {
 
 #[test]
 fn verify_accepts_a_clean_artifact_with_a_matching_hash() {
-    // A genuinely clean artifact (no blocking findings under its profile) with
-    // a matching hash and digest verifies. `verify` re-runs the analysis, so
-    // the artifact must actually be clean, not merely byte-match the approval.
+    // An artifact with no blocking findings under its profile verifies when
+    // its hash and policy digest match. `verify` repeats analysis, so the
+    // approved bytes must still pass that profile.
     let payload = b"Reads a file and returns its bytes.";
     let approval = Approval {
         artifact_sha256: ai_slop::input::sha256_hex(payload),
@@ -118,7 +118,7 @@ fn verify_fails_on_hash_digest_or_expiry_mismatch() {
     ));
 }
 
-// --- verify re-runs analysis: an approval must be EARNED, not byte-matched.
+// Verification repeats analysis. Matching approval bytes must also pass analysis.
 
 fn approval(profile: &str, payload: &[u8], waivers: Vec<Waiver>) -> Approval {
     Approval {
@@ -377,7 +377,7 @@ fn analyze_ignores_agent_waivers_on_human_only_rules() {
 
 // verify carries the approval's demote list so it agrees with the gate that
 // issued the approval. A deployment that demotes a candidate rule gets `check`
-// exit 0 and honestly mints an approval; verify must re-run WITH that demote
+// exit 0 and honestly mints an approval. Verify must re-run with that demote
 // and accept the same bytes. This test fails against code that drops demote
 // (the finding returns blocking and verify falsely rejects the honest approval).
 #[test]
@@ -394,7 +394,7 @@ fn verify_carries_approval_demote_and_agrees_with_the_gate() {
         "gate should pass with the demote applied"
     );
 
-    // The honest approval carries that demote; verify re-runs with it and accepts.
+    // The honest approval carries that demote. Verify re-runs with it and accepts.
     let mut with_demote = approval("internal-doc", payload, vec![]);
     with_demote.demote = vec!["SLOP-C003".to_string()];
     assert_eq!(
@@ -403,7 +403,7 @@ fn verify_carries_approval_demote_and_agrees_with_the_gate() {
         "verify must agree with the gate on the same bytes"
     );
 
-    // Sanity: without the demote the same bytes are rejected — C003 blocks.
+    // Sanity: without the demote the same bytes are rejected, C003 blocks.
     // This is exactly the state pre-fix verify was stuck in.
     let bare = approval("internal-doc", payload, vec![]);
     let problems = rejects(ai_slop::verify(payload, &bare, 1_000_000_000));

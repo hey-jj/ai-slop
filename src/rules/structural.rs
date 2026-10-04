@@ -95,7 +95,7 @@ pub fn evaluate(
 }
 
 /// SLOP-X004 `exempt_heading_sets`: true when the profile has an entry and
-/// the document's headings AFTER the first (the title, per SLOP-K001),
+/// the document's headings after the first (the title, per SLOP-K001),
 /// lowercased, equal one listed set exactly and in order. An extra, missing,
 /// or reordered heading fails the match, so the exemption covers only the
 /// declared template.

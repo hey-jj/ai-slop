@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
-# MSRV gate for the declared rust-version (1.85).
+# MSRV gate for the declared rust-version, 1.85.
 #
 # The shipped Cargo.lock is inert for dependents: a downstream user's cargo
 # resolves the dependency graph fresh from the index. So this gate builds a
-# real external consumer crate that depends on ai-slop by path, with NO
-# lockfile carried over, on a 1.85 toolchain — exactly what a downstream
+# real external consumer crate that depends on ai-slop by path, with no
+# lockfile carried over, on a 1.85 toolchain, exactly what a downstream
 # user at the MSRV floor experiences. It then builds ai-slop itself at 1.85
 # to prove the crate's own code compiles at the declared floor.
 #
-# Run it with a 1.85.x toolchain active (e.g. `rustup run 1.85.0 ci/msrv-consumer.sh`).
+# Run with a 1.85.x toolchain, for example `rustup run 1.85.0 ci/msrv-consumer.sh`.
 set -euo pipefail
 
 CRATE_DIR="$(cd "$(dirname "$0")/.." && pwd)"
@@ -54,7 +54,7 @@ fn main() {
 }
 EOF
 
-# Deliberately no lockfile in $CONSUMER: cargo resolves fresh from the index,
+# $CONSUMER starts without a lockfile, so cargo resolves from the index,
 # as any dependent would. A transitive dep whose current version needs >1.85
 # fails this build even though ai-slop's own pinned lockfile builds fine.
 echo "== external consumer: fresh-resolution build at 1.85 =="

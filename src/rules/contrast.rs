@@ -1,26 +1,26 @@
-//! contrast family structural rules.
+//! Structural contrast rules.
 //!
 //! SLOP-C007 apophatic self-definition,
-//! trigger T1 — the trailing negation tag (`, not <NP>.` / `, never <NP>.`).
+//! trigger T1, the trailing negation tag (`, not <NP>.` / `, never <NP>.`).
 //! The rule's T2-T4 trigger forms are declared as bounded `patterns` on the
 //! policy block and served by the shared regex engine with span mapping and
-//! trigger fidelity inherited; this module implements only the tail form,
+//! trigger fidelity inherited. This module implements only the tail form,
 //! which is where the imperative-opener and second-person suppression logic
 //! lives. E001 precedent: bounded hand-rolled scans over policy params, no
 //! regex, no new dependency.
 //!
 //! The scan runs over the norm view (NFC, entity decode, escape resolution,
-//! invisible removal, soft-break folding; prose-only with U+FFFD barriers at
+//! invisible removal, soft-break folding. Prose-only with U+FFFD barriers at
 //! code spans, so flanking text never fuses across a code region). Every
 //! window is bounded by policy params, honoring the crate-wide ban on
 //! unbounded scans. FP-safety is the design bias: every suppression doubt
-//! resolves toward silence, and the one deliberate inversion — a clause
-//! whose start lies beyond the walk-back window fires by default — is the
+//! resolves toward silence, and the one deliberate inversion, a clause
+//! whose start lies beyond the walk-back window fires by default, is the
 //! spec's fail-toward-candidate-report choice.
 //!
-//! SLOP-C010 proleptic capability denial — a denial of a capability nobody
+//! SLOP-C010 proleptic capability denial, a denial of a capability nobody
 //! claimed, and the evidential hedge that rides with it. The scan reads
-//! clauses rather than spans, because the shape is a stack: a restatement of
+//! clauses. The shape is a stack: a restatement of
 //! what the thing does, a denial of something it was never accused of, and a
 //! hedge over the denial. Its two arms are the density arm (two qualifying
 //! clauses in one block) and the adjacency arm (one qualifying clause beside
@@ -104,15 +104,15 @@ fn contains_word(hay_lower: &str, needle: &str) -> bool {
 /// number-internal (`U.S`, `3.5`): not a terminal. A period followed by a
 /// bounded ASCII space/tab run and then a lowercase continuation is
 /// mid-sentence punctuation (`U.S. but`, `e.g. the`): not a terminal.
-/// Everything else — end of text, a line break, an uppercase/digit/quote/
+/// Everything else, end of text, a line break, an uppercase/digit/quote/
 /// bracket/barrier follower, a whitespace run past the parser's 8-unit
-/// bound — is a terminal, exactly as before this test existed. The peek is
+/// bound, is a terminal, exactly as before this test existed. The peek is
 /// O(1) and bounded, honoring the crate-wide ban on unbounded scans.
 /// Accepted false negatives (KNOWN-EDGES): chat-style prose that starts
 /// sentences lowercase reads a real terminal as a continuation and stays
 /// silent, and an abbreviation followed by a capitalized word (`Mr. Smith`)
-/// still reads as a terminal — both resolve toward silence or the
-/// pre-existing behavior, never toward a new firing surface.
+/// still reads as a terminal, both resolve toward silence or the
+/// pre-existing behavior. Neither adds a firing surface.
 pub(crate) fn period_is_terminal(text: &str, dot_end: usize) -> bool {
     let mut chars = text[dot_end..].chars();
     let Some(first) = chars.next() else {
@@ -122,7 +122,7 @@ pub(crate) fn period_is_terminal(text: &str, dot_end: usize) -> bool {
         return false; // abbreviation- or number-internal
     }
     if first != ' ' && first != '\t' {
-        // Line breaks end the block; quotes, brackets, punctuation, and the
+        // Line breaks end the block. Quotes, brackets, punctuation, and the
         // U+FFFD barrier all sit on the terminal side.
         return true;
     }
@@ -187,7 +187,7 @@ pub(crate) fn temporal_while(matched: &str) -> bool {
         "am", "is", "are", "was", "were", "has", "have", "had", "do", "does", "did", "can",
         "could", "will", "would", "shall", "should", "may", "might", "must",
     ];
-    /// The participles that concede rather than report an activity.
+    /// Participles that introduce concessions and retain SLOP-C004.
     const CONCESSION_PARTICIPLES: &[&str] = &[
         "acknowledging",
         "recognizing",
@@ -220,7 +220,7 @@ pub(crate) fn temporal_while(matched: &str) -> bool {
         None => clause,
     };
     let toks = tokenize(clause, 0..clause.len());
-    // A participle in the very next slot, with the eight concessions held out,
+    // A participle in the next slot, with the eight concessions held out,
     // the quantifier pronouns held out by the shared morphology list, and no
     // finite verb between the keyword and the comma.
     let finite = toks
@@ -283,28 +283,26 @@ pub(crate) fn temporal_while(matched: &str) -> bool {
 }
 
 /// Five words that end in the same three letters without being participles.
-/// The list is English morphology, the same kind of fact as the base-form
-/// suffix test, so it lives in code beside the parser that reads it instead of
-/// in policy data.
+/// The list records English morphology, as does the base-form suffix test.
+/// It lives in code beside the parser that reads it. Policy data holds no
+/// copy of the list.
 const NOT_PARTICIPLES: &[&str] = &["nothing", "anything", "something", "everything", "during"];
 
-/// Parse the T1 tail shape starting at the comma at `comma`: up to 8
-/// whitespace characters, `not` or `never` (case-insensitive, followed by
-/// 1..=8 whitespace), then an NP of 1..=`np_max` bytes containing none of
-/// `!?;:,\n` (nor a U+FFFD barrier) and at least one non-whitespace
-/// character (a whitespace-only "NP" is not a noun phrase), closed by a
-/// terminal `.`, `!`, or `?`. A non-terminal `.` (abbreviation-internal or
-/// mid-sentence per `period_is_terminal`) is legal NP content. Returns the
-/// exclusive end offset of the terminal punctuation. The
-/// no-interior-comma constraint is what keeps the parenthetical
-/// `X, not Y, verb ...` interpolation out of scope, and a word-bounded
-/// `but` anywhere in the NP rejects the tail outright: a contrastive
-/// continuation (`, not in the U.S. but in Asia.`) is the not-X-but-Y pair
-/// form — SLOP-C008's territory and a legitimate contrast — never a bare
-/// apophatic caveat.
-/// Both whitespace loops match ASCII whitespace only (space/tab/LF/CR),
-/// by design: a non-ASCII space inside a contrastive tail is an
-/// attacker-unrealistic vector (see KNOWN-EDGES).
+/// Parse the T1 tail shape at the comma at `comma`. Accept up to 8 ASCII
+/// whitespace characters, then exactly `not` or `never`, case-insensitively.
+/// Require 1..=8 whitespace characters after that keyword. The NP contains
+/// 1..=`np_max` bytes and at least one non-whitespace character. It excludes
+/// `!?;:,\n` and the U+FFFD barrier. A terminal `.`, `!`, or `?` closes it.
+/// A non-terminal period remains NP content, including abbreviation-internal
+/// and mid-sentence periods identified by `period_is_terminal`.
+/// Return the exclusive end offset of the terminal punctuation.
+/// An interior comma excludes parenthetical `X, not Y, verb ...` interpolations.
+/// A word-bounded `but` anywhere in the NP rejects the tail. A continuation
+/// such as `, not in the U.S. but in Asia.` belongs to SLOP-C008's legitimate
+/// paired-contrast form. The bare apophatic-caveat rule excludes that form.
+/// Both whitespace loops accept ASCII space, tab, LF, and CR only.
+/// KNOWN-EDGES records non-ASCII spaces in a contrastive tail as an
+/// attacker-unrealistic vector.
 fn parse_tail(text: &str, comma: usize, np_max: usize) -> Option<usize> {
     let rest = text.get(comma + 1..)?;
     let mut i = 0usize;
@@ -316,8 +314,8 @@ fn parse_tail(text: &str, comma: usize, np_max: usize) -> Option<usize> {
         }
     }
     let after_ws = &rest[i..];
-    // `get` rather than direct slicing: the byte at the cut can sit inside a
-    // multi-byte character, and a directly sliced prefix would panic there.
+    // Use `get` at the byte cut. A cut inside a multi-byte character would
+    // panic with direct prefix slicing.
     let kw_len = if after_ws
         .get(..5)
         .is_some_and(|s| s.eq_ignore_ascii_case("never"))
@@ -364,7 +362,7 @@ fn parse_tail(text: &str, comma: usize, np_max: usize) -> Option<usize> {
         return None;
     }
     // NP scan: bounded, no clause punctuation, must close with a terminal,
-    // and must carry at least one non-whitespace character — an empty or
+    // and must carry at least one non-whitespace character, an empty or
     // whitespace-only span between the keyword and the terminal is not a
     // noun phrase.
     let np_start = j;
@@ -373,8 +371,8 @@ fn parse_tail(text: &str, comma: usize, np_max: usize) -> Option<usize> {
     for c in rest[np_start..].chars() {
         match c {
             '.' if !period_is_terminal(text, comma + 1 + k + 1) => {
-                // Abbreviation-internal or mid-sentence period (`U.S.`,
-                // `e.g.`): NP content, not a terminal.
+                // Abbreviation-internal or mid-sentence periods (`U.S.`, `e.g.`) remain
+                // NP content. They do not terminate this phrase.
                 np_has_content = true;
                 k += 1;
                 if k - np_start > np_max {
@@ -385,12 +383,10 @@ fn parse_tail(text: &str, comma: usize, np_max: usize) -> Option<usize> {
                 if !np_has_content {
                     return None; // empty or whitespace-only NP
                 }
-                // A word-bounded `but` inside the tail means the negation
-                // carries its own contrastive continuation ("not in the
-                // U.S. but in Asia"): a not-X-but-Y pair, which is a
-                // legitimate contrast shape and SLOP-C008's territory, not
-                // a bare apophatic caveat. The comma-tail rule stays
-                // silent. Bounded: the NP is at most `np_max` bytes.
+                // A word-bounded `but` inside the tail carries a contrast continuation,
+                // such as `not in the U.S. but in Asia`. This legitimate paired contrast
+                // belongs to SLOP-C008. The bare apophatic-caveat rule stays silent.
+                // The NP remains bounded at `np_max` bytes.
                 let np_lower = rest[np_start..k].to_ascii_lowercase();
                 if contains_word(&np_lower, "but") {
                     return None;
@@ -413,17 +409,17 @@ fn parse_tail(text: &str, comma: usize, np_max: usize) -> Option<usize> {
 }
 
 /// Recover the clause start: walk back from the comma at most `window`
-/// bytes to the nearest clause boundary — a line break, or terminal
+/// bytes to the nearest clause boundary, a line break, or terminal
 /// punctuation (`.`, `!`, `?`, plus `:` per the design) followed by
-/// whitespace — mirroring the engine's own block-start notion
+/// whitespace, mirroring the engine's own block-start notion
 /// (`NormView::is_block_start`) as a single bounded backward pass. A `.`
-/// additionally goes through `period_is_terminal`, so an abbreviation
-/// (`the U.S. market`) no longer truncates the recovered clause — the
+/// goes through `period_is_terminal`, so an abbreviation
+/// (`the U.S. market`) no longer truncates the recovered clause, the
 /// suppression classifier sees the whole sentence, an FP-reducing change.
 /// The `:` `!` `?` arms are untouched: a colon followed by lowercase is a
 /// legitimate clause boundary and must stay one. Offset 0
 /// counts as a boundary when it lies inside the window. `None` means the
-/// window was exhausted without a boundary; the caller fires by default.
+/// window was exhausted without a boundary. The caller fires by default.
 fn clause_start(text: &str, comma: usize, window: usize) -> Option<usize> {
     let lo = crate::widen_to_char_boundaries(text, comma.saturating_sub(window)..comma).start;
     let region = &text[lo..comma];
@@ -475,9 +471,9 @@ fn suppressed(clause: &str, openers: &[String], second_person: &[String]) -> boo
     if second_person.iter().any(|t| contains_word(&lower, t)) {
         return true;
     }
-    // 3. A deny-list verb immediately after an interior `, ` or after
-    //    `then ` — the leading-adverbial directive
-    //    ("When in doubt, use the builder, not the raw constructor.").
+    // 3. A deny-list verb directly after an interior `, ` or after `then `
+    // marks a leading-adverbial directive, as in
+    // `When in doubt, use the builder, not the raw constructor.`
     let mut at = 0usize;
     while let Some(pos) = lower[at..].find(", ") {
         let s = at + pos + 2;
@@ -540,7 +536,7 @@ fn evaluate_c007(
             continue;
         };
         // Clause recovery within the bounded window. A recovered clause goes
-        // through the suppression classifier; an exhausted window fires by
+        // through the suppression classifier. An exhausted window fires by
         // default (spec section 3: fail toward the candidate report).
         if let Some(cs) = clause_start(text, comma, window) {
             if suppressed(&text[cs..comma], &openers, &second_person) {
@@ -570,7 +566,7 @@ fn evaluate_c007(
 
 /// One word token of the norm view, with its absolute byte range. Hyphens
 /// stay inside the token so a product name (`ai-slop`) and a hyphen-spelled
-/// noun read as one word; the typographic apostrophe folds to the ASCII one
+/// noun read as one word. The typographic apostrophe folds to the ASCII one
 /// so `doesn\u{2019}t` matches the base-form entry `doesn't`.
 pub(crate) struct Tok {
     pub start: usize,
@@ -633,7 +629,7 @@ pub(crate) struct PhraseMatch {
 /// the coreference test reads is the last wildcard token before the copula. In
 /// `no finding in the report is evidence` that token would be `report`, so the
 /// test would ask about the wrong noun and answer confidently. Stopping short
-/// leaves a four-token noun phrase unmatched, which is silence.
+/// leaves a four-token noun phrase with no match, which is silence.
 pub(crate) fn phrase_match(toks: &[Tok], i: usize, phrase: &str) -> Option<PhraseMatch> {
     const WILDCARD_MAX: usize = 3;
     let parts: Vec<&str> = phrase.split_whitespace().collect();
@@ -925,7 +921,7 @@ fn capability_verb_in(
 /// head one: the finite forms need a subject, so a clause they head is always
 /// declarative. `Do not obey` is a command because `obey` is base form, read
 /// with one `-ly` adverb allowed to sit between the negation and its verb.
-/// One excluded shape is recorded rather than dropped: a segment that opens on
+/// Record one excluded shape: a segment that opens on
 /// `and` and denies a capability in base form finishes a sentence, and whether
 /// it is a command depends on what the sentence said first. The caller settles
 /// that, and this reader stays a function of its own segment.
@@ -1221,7 +1217,7 @@ fn clause_content(text: &str, range: std::ops::Range<usize>) -> std::ops::Range<
 /// segment that follows it, where the leading-coordinator skip reads it, so a
 /// coordinated denial presents each half to the family tests on its own. This
 /// is the same single segmentation pass the exclusion and the partner search
-/// use; there is no second splitter.
+/// use. There is no second splitter.
 fn segment_ranges(text: &str, clause: std::ops::Range<usize>) -> Vec<std::ops::Range<usize>> {
     const COORDINATORS: &[&str] = &["and", "or", "but", "yet", "so", "nor"];
     let toks = tokenize(text, clause.clone());
@@ -1286,16 +1282,14 @@ fn evaluate_c010(
                     segs.push(read_clause(text, segment, clause.clone(), &sets));
                 }
             }
-            // The `and`-joined denial, settled here because the reader above
-            // sees one segment at a time. "The rules read text and never
-            // detect authorship" names its subject once and carries it across
-            // the coordinator, so the second half is a statement about the
-            // rules rather than an instruction to the reader. An earlier
-            // segment of the same sentence has to supply that subject, which
-            // is what keeps "Read the report and never judge by one finding"
-            // and a bare "Never detect authorship" out. The denial has no
-            // subject of its own, so it is coreferent with whatever the
-            // sentence already named.
+            // Settle the `and`-joined denial here because the reader above sees one
+            // segment at a time. `The rules read text and never detect authorship`
+            // names its subject once and carries it across the coordinator. The
+            // second half states a fact about the rules. An earlier segment of the
+            // same sentence must supply that subject. This keeps the commands
+            // `Read the report and never judge by one finding` and
+            // `Never detect authorship` out. The denial has no subject of its own,
+            // so it refers to the subject the sentence already named.
             let mut named = false;
             for seg in &mut segs {
                 if seg.joined_denial && named {
@@ -1333,7 +1327,7 @@ fn evaluate_c010(
             // The partner search stops at the first match, in the ruled
             // order: the other segments of this sentence, then the sentence
             // before, then the sentence after. Within one sentence there is
-            // no distance limit; across sentences the search stays strictly
+            // no distance limit. Across sentences the search stays strictly
             // adjacent. One finding per qualifying clause, however many
             // partners match.
             let within = reads[si].iter().any(|other| {

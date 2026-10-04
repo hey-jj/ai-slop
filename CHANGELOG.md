@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.1.15] - 2026-10-03
+
+### Documentation
+
+- Comments and API docs state parser boundaries, span mapping, quotation
+  handling, and repeated-text limits in direct sentences.
+- Rule examples in comments name the wording families they exercise.
+
+### Changed
+
+- The generated policy snapshot header tells readers to run the snapshot
+  command to regenerate the file.
+
 ## [0.1.14] - 2026-09-29
 
 ### Added

@@ -99,19 +99,18 @@ pub fn prepare(input: &[u8], config: &Config) -> Result<Prepared, AnalysisError>
 /// the prose/code split is the REAL extractor's segmentation: `code_blocks`
 /// is the extractor's code-BLOCK region list, which covers backtick fences,
 /// tilde `~~~` fences, and 4-space indented code blocks alike. A line that
-/// overlaps any code block is code and never counts — a bug report with an
+/// overlaps any code block is code and never counts. A bug report with an
 /// indented reproducer and a tilde-fenced Rust README both stay prose.
 ///
-/// Scope is narrow on purpose. The test reads Rust shape, and nothing else.
-/// Source in another language reaches the rules and produces findings a
-/// reader discounts, which buys a guard that stays off prose. The guard
-/// catches a mistake and is not a security boundary: a writer who prefixes
-/// every line with a comment marker gets past it, which is recorded rather
-/// than closed.
+/// The guard reads Rust shape only. Source in other languages reaches the
+/// prose rules and can produce findings unrelated to its writing. The guard
+/// catches accidental source input. It provides no security boundary. A
+/// writer who prefixes every line with a comment marker can pass it. This
+/// comment records that limit.
 ///
-/// Returns `Some((rust_lines, nonblank_lines))` when at least
-/// `RUST_GUARD_MIN_LINES` lines carry Rust structure AND they are at least
-/// `RUST_GUARD_MIN_PCT` percent of the non-blank outside-code lines.
+/// Return `Some((rust_lines, nonblank_lines))` when at least
+/// `RUST_GUARD_MIN_LINES` outside-code lines have Rust structure and reach
+/// `RUST_GUARD_MIN_PCT` percent of nonblank outside-code lines.
 const RUST_GUARD_MIN_LINES: usize = 8;
 const RUST_GUARD_MIN_PCT: usize = 35;
 
@@ -157,7 +156,7 @@ pub fn rust_line_counts(text: &str, code_blocks: &[Range<usize>]) -> (usize, usi
 /// segmentation already excludes, so counting plain `//` costs no prose and
 /// closes most of the comment-prefix evasion on the way past.
 ///
-/// Arm 2 needs both halves. The line ends on a code terminator AND either
+/// Arm 2 needs both halves. The line ends on a code terminator and either
 /// opens on an item or binding keyword, optionally behind a visibility or
 /// modifier word, or carries a path, arrow, or fat-arrow token, or has the
 /// field-line shape. Requiring both halves is what keeps prose out: a
@@ -200,7 +199,7 @@ fn rust_shaped_line(t: &str) -> bool {
         || field_line(t)
 }
 
-/// The field-line shape, kept tight on purpose: one identifier, a colon, ONE
+/// The field-line shape, kept tight on purpose: one identifier, a colon, one
 /// type expression carrying no sentence structure, then a comma, optionally
 /// behind `pub` or `pub(crate)`. A definition list writes several words after
 /// its colon, so `- name: the person who signed,` never matches, and a bare

@@ -1,7 +1,7 @@
 //! duplication family structural rule: SLOP-U001 verbatim self-duplication.
-//! Order-k word shingles seed candidate matches over the norm view; every
-//! candidate is verified by exact token comparison and extended to the
-//! maximal shared run, so the matcher itself cannot false-positive — every
+//! Order-k word shingles seed candidate matches over the norm view. Every
+//! candidate is checked by exact token comparison and extended to the
+//! maximal shared run, so the matcher itself cannot false-positive, every
 //! emitted run is a true verbatim repeat of at least `min_run_words` words.
 //! FP risk lives entirely in adjudication (deliberate refrains, legal
 //! boilerplate), which the guard and judge carry.
@@ -9,22 +9,22 @@
 //! The shingle chain breaks at U+FFFD barriers, so code regions never
 //! shingle and prose never fuses across a code span. A quote-touching
 //! shingle neither anchors a bucket nor matches one: epigraphs and repeated
-//! quoted claims are quotation, not self-duplication — and a quoted first
+//! quoted claims are quotation, not self-duplication, and a quoted first
 //! copy must not suppress a later prose-to-prose repeat. One forward pass,
 //! exact verification bounded by the run length, a capped walk over prior
 //! occurrences of each shingle (bounded recall: prefix-sharing decoys
 //! cannot mask the genuine duplicate between later copies unless every
-//! k-word window of the run is separately flooded past `WALK_CAP` — an
+//! k-word window of the run is separately flooded past `WALK_CAP`, an
 //! accepted, attacker-unrealistic edge recorded in KNOWN-EDGES), emission
 //! capped at
-//! `max_reports` (longest first) — near-linear time, memory proportional
+//! `max_reports` (longest first), near-linear time, memory proportional
 //! to the token count,
 //! honoring the crate-wide ban on unbounded scans. The memory bound is
 //! deliberate and flat: one shared fold buffer instead of an owned String
 //! per word, and an intrusive per-token chain instead of a heap Vec per
-//! distinct shingle, so the worst-case 2 MiB input costs tens of megabytes,
-//! not hundreds. Determinism does not depend on hash values: every hash
-//! revisit is verified by text, and `DefaultHasher` is fixed-key.
+//! distinct shingle. The worst-case 2 MiB input uses tens of megabytes.
+//! Determinism does not depend on hash values: every hash
+//! revisit is checked by text, and `DefaultHasher` is fixed-key.
 
 use crate::engine::{CompiledPolicy, Hit};
 use crate::input::Prepared;
@@ -53,7 +53,7 @@ struct Tok {
     seg: u32,
 }
 
-/// Tokenizer output: byte-range tokens over the norm text plus ONE shared
+/// Tokenizer output: byte-range tokens over the norm text plus one shared
 /// buffer holding every folded word back to back. The buffer replaces the
 /// old `Vec<String>` (an owned String per word), which multiplied a 2 MiB
 /// input into hundreds of megabytes of small allocations on a worst-case
@@ -75,7 +75,7 @@ impl Tokens {
         &self.buf[s..e]
     }
 
-    /// Element-wise equality of the k-word shingles at `a` and `b` — the
+    /// Element-wise equality of the k-word shingles at `a` and `b`, the
     /// same comparison the old `words[a..a + k] == words[b..b + k]` slice
     /// equality performed, word boundaries included.
     fn shingles_eq(&self, a: usize, b: usize, k: usize) -> bool {
@@ -84,7 +84,7 @@ impl Tokens {
 }
 
 /// Lowercased word tokens (alphanumeric plus apostrophe, with the
-/// typographic apostrophe folded — the `first_token` charset from the
+/// typographic apostrophe folded, the `first_token` charset from the
 /// contrast module) with byte spans in norm coordinates.
 fn tokenize(text: &str) -> Tokens {
     let mut toks = Vec::new();
@@ -132,7 +132,7 @@ fn tokenize(text: &str) -> Tokens {
 
 fn shingle_hash(tokens: &Tokens, i: usize, k: usize) -> u64 {
     // Fixed-key SipHash: deterministic across runs and processes. Output
-    // correctness does not depend on it — collisions are resolved by the
+    // correctness comes from resolving collisions through the
     // exact token comparison below.
     let mut h = std::collections::hash_map::DefaultHasher::new();
     for d in 0..k {
@@ -167,33 +167,33 @@ pub fn evaluate(
     // Shingle hash -> most-recent token index carrying that hash, with
     // earlier carriers chained through `next` (an intrusive singly linked
     // list: each token index sits in at most one bucket, so one
-    // preallocated slot per token suffices). EVERY processed anchor joins
-    // its chain, verified or not: keeping only one representative per
-    // distinct sequence is the prefix-decoy hole — an early occurrence
+    // preallocated slot per token suffices). Every processed anchor joins
+    // its chain, checked or not: keeping only one representative per
+    // distinct sequence is the prefix-decoy hole, an early occurrence
     // that shares the k-word prefix but diverges below the floor would
     // hold the slot and block the genuine duplicate between later copies.
     // A revisit therefore walks the chain (most recent first, capped at
-    // `WALK_CAP` entries) and keeps the candidate whose TOTAL verified
-    // disjoint run — forward AND backward extension both — is maximal, so
+    // `WALK_CAP` entries) and keeps the candidate whose total checked
+    // disjoint run, forward and backward extension both, is maximal, so
     // occ2-vs-occ3 and occ1-vs-occ3-across-a-decoy both land and the
     // reported run is the globally maximal one among walked candidates.
     // (Ranking on forward length alone and backward-extending only the
     // winner let a candidate with a shorter forward match but a longer
-    // total run lose — a non-maximal report.) The cap bounds the walk on
+    // total run lose, a non-maximal report.) The cap bounds the walk on
     // a phrase repeated N times: a candidate whose total run stays under
     // the floor costs under `floor` comparisons across both directions,
     // and a candidate at or above the floor emits and advances `i` past
-    // the run, so total work stays O(WALK_CAP * tokens) — near-linear,
-    // never O(N^2). The cap is also a RECALL bound, per bucket: more
+    // the run, so total work stays O(WALK_CAP * tokens), near-linear.
+    // The walk avoids O(N^2) work. The cap also bounds recall per bucket. More
     // than `WALK_CAP` occurrences of one shingle packed between a
     // genuine copy and its later repeat exhaust that bucket's walk
     // before the true partner is reached. One flooded bucket does not
-    // mask a run — the run's OTHER windows sit in their own buckets, and
+    // mask a run. The run's other windows sit in their own buckets, and
     // total-run ranking recovers the full extent through any unflooded
     // one (backward extension reaches the words in front of the anchor).
-    // Masking a genuine duplicate therefore requires flooding EVERY
+    // Masking a genuine duplicate therefore requires flooding every
     // k-word window of the run past the cap with separate decoy
-    // families — an accepted, attacker-unrealistic edge (see
+    // families, an accepted, attacker-unrealistic edge (see
     // KNOWN-EDGES): the decoy pile is itself glaring repetition on the
     // page.
     const WALK_CAP: usize = 32;
@@ -214,9 +214,9 @@ pub fn evaluate(
         // prose-to-prose repeats) nor match one (a quoted second copy is
         // not self-duplication). Windows straddling a quote boundary are
         // skipped too, so a quoted-first shape re-anchors on the first
-        // all-prose window and later copies align copy-to-copy; a mixed
+        // all-prose window and later copies align copy-to-copy. A mixed
         // prose-and-quote duplicate still reports through its all-prose
-        // windows, since run EXTENSION deliberately ignores quotation.
+        // windows, since run extension includes quoted words.
         if norm.span_has_flag(
             &(toks[i].start..toks[i + k - 1].end),
             crate::extract::F_QUOTED,
@@ -231,15 +231,14 @@ pub fn evaluate(
             }
             Entry::Occupied(mut o) => {
                 // Walk the chain, most recent first, and keep the maximal
-                // TOTAL verified run among disjoint candidates — each
-                // candidate is extended in BOTH directions before ranking,
+                // total checked run among disjoint candidates. Each
+                // candidate is extended in both directions before ranking,
                 // so a candidate with a shorter forward match but a longer
                 // total run wins over a more recent, forward-longer one.
-                // An entry overlapping its own revisit ("the the the") is
-                // repetition inside one passage, not a duplicated passage,
-                // and is skipped; a hash collision fails `shingles_eq` and
+                // An entry overlapping its own revisit (`the the the`) is
+                // repetition inside one passage. Skip this overlapping entry. A hash collision fails `shingles_eq` and
                 // is skipped the same way. Ties keep the first (most
-                // recent) candidate — chain order is a deterministic
+                // recent) candidate. Chain order is a deterministic
                 // function of the input. Cost stays bounded: a candidate
                 // whose total run misses the floor stops each direction at
                 // its first mismatch, under `floor` matching comparisons
@@ -267,7 +266,7 @@ pub fn evaluate(
                         // real run when the run-initial window paired with
                         // a shorter decoy candidate on an earlier pass, or
                         // was skipped as quote-touching. Same guards as
-                        // forward extension — the copies stay disjoint
+                        // forward extension. The copies stay disjoint
                         // (the earlier copy's end is pinned while the
                         // later start moves left, so the gap must stay
                         // positive) and neither side crosses a barrier
@@ -314,17 +313,15 @@ pub fn evaluate(
 
     // Longest first under the emission cap, position as the deterministic
     // tiebreak. `assemble` re-sorts findings by span, so the cap order only
-    // decides WHICH runs survive a degenerate input, not report order.
+    // decides which runs survive a degenerate input. Report order follows spans.
     runs.sort_by_key(|&(e, s, len)| (std::cmp::Reverse(len), s, e));
     runs.truncate(cap);
 
     for (e, s, len) in runs {
         let span = toks[s].start..toks[s + len - 1].end;
         let earlier = toks[e].start..toks[e + len - 1].end;
-        // Backstop only: anchor shingles are pre-filtered for quotation
-        // above, so a surviving run's span cannot be fully quoted — but a
-        // future anchor-filter regression must fail toward silence here,
-        // not toward a quoted finding.
+        // Anchor shingles already exclude quotation. Keep this final check so
+        // a later anchor-filter regression still skips fully quoted runs.
         if norm.all_quoted(&span) || norm.all_quoted(&earlier) {
             continue;
         }

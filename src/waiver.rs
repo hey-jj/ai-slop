@@ -5,24 +5,24 @@ use crate::WaiverAuthority;
 use serde::{Deserialize, Serialize};
 
 /// The only `signer_kind` string that carries human privilege. Any other
-/// value — including an absent one — is untrusted (agent-equivalent). This is
+/// value, including an absent one, is untrusted (agent-equivalent). This is
 /// a fail-closed reading: a waiver is trusted to clear a human-only rule only
 /// when it explicitly names the recognized human signer.
 pub const HUMAN_SIGNER: &str = "human";
 
-/// The single authority-floor decision, consulted by both `analyze` (through
-/// `report::waiver_decision`) and [`verify`] so the two paths cannot
-/// drift. Returns `Ok(())` when a waiver with `signer_kind` may clear
-/// `rule_id` under `authority`, or `Err(reason)` when the floor forbids it.
+/// The authority floor shared by `analyze`, through
+/// `report::waiver_decision`, and `verify`. Return `Ok(())` when the signer
+/// can waive the rule under `authority`, or `Err(reason)` when the floor
+/// forbids it.
 ///
 /// The floor no configuration and no orchestrator-agent signature can lower:
 ///
-/// * `instrumentation_error` and `unsupported_input` are fail-closed states,
-///   never waivable by anyone.
-/// * A human-only rule (`human_only == true`, i.e. the ornamental set) and
+/// * `instrumentation_error` and `unsupported_input` are fail-closed states.
+///   No signer can waive either state.
+/// * A human-only rule (`human_only == true`, the ornamental set) and
 ///   `SLOP-J001` are clearable only by a human-signed waiver.
 /// * Every other rule is agent-waivable only when `authority` is
-///   `OrchestratorAgent`; otherwise it too needs a human signer.
+///   `OrchestratorAgent`. Otherwise it too needs a human signer.
 ///
 /// The signer is read fail-closed: only the exact [`HUMAN_SIGNER`] string is
 /// human-privileged. An absent or unrecognized `signer_kind` is untrusted and
@@ -167,9 +167,8 @@ pub fn parse_rfc3339(s: &str) -> Option<i64> {
     Some(days * 86_400 + hour * 3600 + minute * 60 + second - offset_secs)
 }
 
-/// Verify a payload against an approval record. An approval must be EARNED,
-/// not merely byte-matching: alongside the tuple checks (hash, policy digest,
-/// profile, waiver expiry, and the authority floor) `verify` RE-RUNS the
+/// Verify a payload against an approval record. Check the hash, policy digest,
+/// profile, waiver expiry, and authority floor. `verify` repeats the
 /// analysis under the approval's declared profile with the approval's waiver
 /// set, and fails closed if any unwaived blocking finding remains.
 ///

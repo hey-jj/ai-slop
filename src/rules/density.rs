@@ -83,9 +83,9 @@ pub fn evaluate(
         }
     }
 
-    // SLOP-C009 contrast-density: a reading instrument, not a gate. No
-    // threshold param by design — the absence is the deferred per-profile
-    // probe. Zero hits emit nothing; an all-zero line is noise.
+    // SLOP-C009 reports contrast density as an advisory figure. Per-profile
+    // thresholds remain deferred, so the policy declares no threshold
+    // parameter. Skip a zero count. This advisory instrument never gates.
     if let Some(idx) = super::active(cp, config, "SLOP-C009") {
         let rule = &cp.pkg.rules[idx];
         let ids = param_rule_ids(rule);

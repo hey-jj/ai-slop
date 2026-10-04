@@ -10,8 +10,8 @@ use common::{assert_invariants, has_rule, run};
 
 // --- SLOP-A004 inflated diction ---------------------------------------------
 
-/// A tool description carrying both tells: the tool-noun stack "coverage
-/// instrument" and the participial noun stack "generated-text defects".
+/// A tool description carrying both tells: the tool-noun stack
+/// `coverage instrument` and the participial noun stack `generated-text defects`.
 const INFLATED_DESCRIPTION: &str = "Deterministic detector and coverage instrument \
     for generated-text defects in outbound technical artifacts\n";
 

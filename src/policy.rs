@@ -269,11 +269,11 @@ pub struct Rule {
     pub stances: Vec<FieldStance>,
     /// Exemption collocations. Any phrase covering a match suppresses it.
     pub exemptions: Vec<String>,
-    /// Per-profile case-SENSITIVE covering literals, indexed by profile order
+    /// Per-profile case-sensitive covering literals, indexed by profile order
     /// like `stances`. A hit is suppressed only when the run's profile lists a
     /// literal that contains the hit span with the exact spelling, word-
     /// bounded and standing alone as a token (the label ends at a line end,
-    /// punctuation, or a table-cell bar — never at a continuing word). Unlike
+    /// punctuation, or a table-cell bar). A continuing word prevents exemption. Unlike
     /// `exemptions` (case-insensitive, profile-global), this scopes an
     /// exemption to named profiles: the same bytes stay a finding everywhere
     /// else, and a case variation of the literal still fires.
@@ -310,10 +310,9 @@ pub struct PolicyPackage {
     pub version: String,
     pub digest: String,
     pub quotation_downgrade: Vec<String>,
-    /// Rules whose hits inside claimed-quotation regions are dropped at
-    /// report resolution rather than downgraded. A candidate-tier rule has
-    /// no lower blocking state, so suppression is the quotation semantics
-    /// that fits it.
+    /// Rule ids whose hits in claimed-quotation regions are removed during
+    /// report resolution. Candidate rules have no lower blocking state to
+    /// downgrade to, so they use quotation suppression.
     pub quotation_suppress: Vec<String>,
     pub profile_names: Vec<String>,
     pub profiles: Vec<ProfileDef>,
@@ -804,7 +803,7 @@ pub fn load() -> Result<PolicyPackage, String> {
         }
     }
 
-    // A typo in a quotation-semantics list would silently no-op; fail loud.
+    // A typo in a quotation-semantics list would silently no-op. Fail loud.
     for id in quotation_downgrade.iter().chain(quotation_suppress.iter()) {
         if !rules.iter().any(|r| &r.id == id) {
             return Err(format!("quotation semantics list names unknown rule {id}"));
@@ -918,7 +917,7 @@ mod exempt_heading_sets_tests {
     }
 
     /// The runtime comparison lowercases the document side only, so an
-    /// uppercased literal would never match anything — it fails the load.
+    /// uppercased literal would never match anything. Reject it at load time.
     #[test]
     fn non_lowercase_heading_literal_is_a_load_error() {
         let p = params(r#"exempt_heading_sets = { readme = [["Reproducer"]] }"#);

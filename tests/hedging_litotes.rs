@@ -506,8 +506,8 @@ fn profile_stances() {
 /// Regression: SLOP-F002 matched `re-verified` as a substring inside
 /// `signature-verified`, and a README line saying that capture claims are
 /// read and never signature-verified failed the gate. Every entry now
-/// matches on word edges, and a hyphen compound ending in verified or
-/// confirmed names a mechanism.
+/// matches on word edges. A hyphen compound ending in `verified` or
+/// `confirmed` names a mechanism.
 #[test]
 fn f002_is_silent_inside_signature_verified() {
     let t = "# Title\n\nCapture claims are read, not signature-verified.\n";

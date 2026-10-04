@@ -1,7 +1,7 @@
 //! A whole-document finding anchors on the first character of the payload,
 //! and that character is not always one byte wide.
 //!
-//! A rule that reports about the document rather than about a passage still
+//! A rule that reports about the whole document still
 //! has to name a span, and it names the document's first character. Anchoring
 //! on a hardcoded `0..1` cuts an emoji, an em dash, or an accented letter in
 //! half, and a span landing inside a character fails the span invariant, so
@@ -23,7 +23,7 @@ const EM_DASH: &str = "\u{2014}";
 const ACCENT: &str = "\u{e9}";
 
 /// Every finding sits on character boundaries, and the one anchored at the
-/// document start covers the whole first character rather than a piece of it.
+/// document start covers the whole first character.
 fn assert_anchor(text: &str, profile: Profile, rule: &str) {
     let report = run(text, profile);
     assert_invariants(text, &report);
@@ -128,7 +128,7 @@ fn release_body_anchor_takes_a_whole_character() {
 }
 
 /// The whole failure mode in one assertion: a document opening on a multi-byte
-/// character analyzes rather than erroring, on every prose profile. The
+/// character analyzes successfully, on every prose profile. The
 /// manifest profile is out because it parses TOML, where a line of prose is
 /// unsupported input whatever it opens on.
 #[test]

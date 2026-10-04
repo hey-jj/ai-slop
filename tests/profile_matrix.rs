@@ -100,7 +100,7 @@ fn known_matrix_points() {
         rule("SLOP-S001").stance(Profile::CommitMessage, Field::Trailers),
         Stance::Off
     );
-    // v0.1.5 additions: C007 applies everywhere except api-docs relax; W002
+    // v0.1.5 additions: C007 applies everywhere except api-docs relax. W002
     // follows the scrub family's internal-doc exemption plus api-docs relax.
     assert_eq!(
         rule("SLOP-C007").stance(Profile::Readme, Field::Whole),
@@ -153,7 +153,7 @@ fn known_matrix_points() {
         Stance::Off
     );
     // v0.1.11: public-comment mirrors public-bug-report minus the title
-    // contract. K001 stays off (a comment has no title); the outbound
+    // contract. K001 stays off (a comment has no title). The outbound
     // discipline rules apply.
     assert_eq!(
         rule("SLOP-S002").stance(Profile::PublicComment, Field::Whole),

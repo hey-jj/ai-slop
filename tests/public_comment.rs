@@ -17,7 +17,7 @@ fn filler_words(n: usize) -> String {
 
 /// A first line over 80 characters containing a forbidden title word: the
 /// motivating misfire. K001 fires under public-bug-report and must not fire
-/// under public-comment, where the same text is a comment body, not a title.
+/// under public-comment, which treats the same text only as a comment body.
 const LONG_CRITICAL_FIRST_LINE: &str = "The parser treats the critical guard \
 as optional and it drops the lock before the queue drain step finishes.\n\n\
 The drain then races the producer.\n";
@@ -63,7 +63,7 @@ fn k001_stays_off_for_a_comment_and_fires_for_a_bug_report() {
 #[test]
 fn over_structured_short_comment_fires_x004_with_no_exemption_set() {
     // Under 300 words with four headings. public-bug-report has an exempt
-    // heading set for X004; public-comment declares none, so the generic
+    // heading set for X004. Public-comment declares none, so the generic
     // structure rule applies as-is.
     let doc = "# A\n\ntext\n\n## B\n\ntext\n\n## C\n\ntext\n\n## D\n\ntext\n";
     let report = run(doc, Profile::PublicComment);

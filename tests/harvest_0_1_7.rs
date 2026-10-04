@@ -11,8 +11,8 @@ use common::{assert_invariants, has_rule, run};
 
 // --- P1: SLOP-E002 profile_exemptions, case-sensitive and profile-scoped ----
 
-/// The exact ledger verdict token, standing alone — its own clause end or a
-/// table cell — is internal-doc vocabulary: the E002 hit on its `NOT` is
+/// The exact ledger verdict token, standing alone, its own clause end or a
+/// table cell, is internal-doc vocabulary: the E002 hit on its `NOT` is
 /// suppressed because the listed literal covers the span as a standalone
 /// token.
 #[test]
@@ -32,7 +32,7 @@ fn e002_standalone_do_not_build_is_exempt_on_internal_doc() {
 }
 
 /// The same bytes on an outbound surface stay a candidate: the exemption is
-/// scoped to the profiles the policy lists, never global.
+/// scoped to the profiles listed by the policy.
 #[test]
 fn e002_do_not_build_still_fires_on_public_bug_report() {
     let t = "The verdict stands: DO NOT BUILD.\n";
@@ -75,7 +75,7 @@ fn e002_embedded_literal_spelling_still_fires_on_internal_doc() {
     );
 }
 
-/// The literal is case-SENSITIVE: a case variation of the token is not the
+/// The literal is case-sensitive: a case variation of the token is not the
 /// documented verdict vocabulary and still fires, even on internal-doc.
 #[test]
 fn e002_case_variation_still_fires_on_internal_doc() {
@@ -196,10 +196,10 @@ fn x004_exemption_is_profile_scoped() {
     );
 }
 
-// --- P4: SLOP-W001 hyphen forms of the technical port compounds ---------------
+// --- P4: SLOP-W001 hyphen forms of the technical serial and network compounds ---
 
 /// The listed technical compounds are exemption literals, hyphen spelling
-/// included. Only these stay silent — hyphenation itself suppresses nothing.
+/// included. Only these stay silent. Hyphenation preserves other matches.
 #[test]
 fn w001_hyphenated_technical_compounds_do_not_fire() {
     for text in [
@@ -265,7 +265,7 @@ fn hyphen_suppression_does_not_leak_to_other_rules() {
     );
 }
 
-// --- P7: SLOP-C004 stays line-start; hand-read owns the mid-paragraph form ---
+// --- P7: SLOP-C004 stays line-start. Hand-read owns the mid-paragraph form ---
 
 /// The mid-paragraph "While X, Y" concession is the skill's hand-read shape,
 /// not the rule's: a 958-file corpus probe measured the widened
@@ -396,7 +396,7 @@ fn c004_sentence_boundary_arm_rejects_list_markers_and_abbreviations() {
 /// The reconstruction fixture (the original session sentence was reworded
 /// before filing, so this is a labeled same-shape substitute): with the
 /// sentence-start arm demoted to the skill's hand-read, the machine
-/// expectation is a clean pass — the concession sentence is the hand-read's
+/// expectation is a clean pass. The concession sentence is the hand-read's
 /// to rule, and no X004 because the report carries the house template (P2).
 #[test]
 fn c004_reconstruction_fixture_expectation() {

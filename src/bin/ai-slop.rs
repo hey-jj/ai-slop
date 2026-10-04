@@ -25,10 +25,10 @@ fn main() -> ExitCode {
     }
 }
 
-/// Write one line to stdout, treating a write failure — a closed pipe, a
-/// closed descriptor — as quiet truncation exactly like the guarded report
-/// path. A downstream `head` must never turn into a panic backtrace; the
-/// intended exit code is still returned by the caller.
+/// Write one line to stdout. A closed pipe or descriptor truncates the output
+/// quietly, as on the report path. The caller keeps its intended exit code
+/// when a consumer such as `head` closes stdout. That closure never causes
+/// a panic backtrace.
 fn emit_line(text: &str) {
     let mut out = std::io::stdout().lock();
     let _ = writeln!(out, "{text}");
@@ -268,8 +268,9 @@ fn cmd_check(mut parser: lexopt::Parser) -> Result<u8, lexopt::Error> {
             for note in &report.coverage.notes {
                 eprintln!("ai-slop: note: {note}");
             }
-            // Serialize straight into the locked stdout: no whole-report
-            // String, and a closed pipe is quiet truncation, not a panic.
+            // Serialize through BufWriter into locked stdout without allocating
+            // a whole-report String. A closed pipe truncates output quietly
+            // and never causes a panic.
             let mut out = std::io::BufWriter::new(std::io::stdout().lock());
             match serde_json::to_writer(&mut out, &report) {
                 Ok(()) => {

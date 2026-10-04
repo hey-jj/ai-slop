@@ -34,7 +34,7 @@ fn word_hit_in(hay: &str, base: usize, word: &str) -> Option<Range<usize>> {
             .next()
             .map(unicode_ident::is_xid_continue)
             .unwrap_or(false);
-        // Identifiers containing forbidden substrings do not fire; a hyphen
+        // Identifiers containing forbidden substrings do not fire. A hyphen
         // joined token like `non-critical-path` is treated as an identifier.
         let hyphenated = lower[..s].ends_with('-') || lower[e..].starts_with('-');
         if before_ok && after_ok && !hyphenated {

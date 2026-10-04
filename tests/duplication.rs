@@ -62,7 +62,7 @@ fn u001(report: &ai_slop::Report) -> Vec<&ai_slop::Finding> {
 }
 
 /// A verbatim restated paragraph (14 words, above the 10-word floor) fires
-/// exactly once, on the SECOND copy, as an experimental candidate.
+/// exactly once, on the second copy, as an experimental candidate.
 #[test]
 fn u001_restated_paragraph_fires_once_on_the_second_copy() {
     let text = format!(
@@ -84,7 +84,7 @@ fn u001_restated_paragraph_fires_once_on_the_second_copy() {
     assert!(text[span.start..span.end].starts_with("The gate runs"));
 }
 
-/// The 10-word floor: a 9-word repeat is deliberate silence, not a miss.
+/// The reporting floor is ten words, so a nine-word repeat stays silent.
 #[test]
 fn u001_nine_word_repeat_is_below_the_floor() {
     let nine = "The gate runs the policy over every draft twice.";
@@ -111,7 +111,7 @@ fn u001_third_occurrence_reports_again() {
 }
 
 /// The `max_reports` cap under a degenerate repeated-stem input (the #410
-/// shape): 25 disjoint repeats emit exactly the cap, never more.
+/// shape): 25 disjoint repeats emit exactly the cap.
 #[test]
 fn u001_emission_cap_is_respected() {
     let mut text = String::new();
@@ -166,14 +166,12 @@ fn u001_quoted_first_occurrence_does_not_suppress_prose_duplicates() {
     assert!(text[span.start..span.end].starts_with("The gate runs"));
 }
 
-/// The 0.1.6 memory pin: a near-2 MiB all-distinct-words document — every
-/// 8-word shingle unique, the shape that made the old per-word String
-/// tokenizer and per-shingle Vec index balloon to hundreds of MiB — must
-/// analyze inside a flat heap budget. The bound covers PEAK HEAP for the
-/// whole test binary (every pass, not just U001, plus this fixture's own
-/// ~4 MiB): 100 MiB keeps the crate safe in a 256 MiB worker with
-/// headroom, and the measured post-fix peak sits well under half the
-/// bound.
+/// The 0.1.6 memory pin uses a near-2 MiB all-distinct-words document. Every
+/// 8-word shingle is unique. This shape made the old per-word String tokenizer
+/// and per-shingle Vec index reach hundreds of MiB. Analysis must stay inside
+/// a flat peak-heap budget for the whole test binary. That includes every pass
+/// and this fixture's own ~4 MiB. The 100 MiB ceiling leaves headroom in a
+/// 256 MiB worker. The measured post-fix peak sits well under half the ceiling.
 #[test]
 fn u001_worst_case_shape_stays_inside_the_memory_budget() {
     use std::fmt::Write as _;
@@ -231,9 +229,9 @@ fn u001_prefix_decoy_does_not_mask_a_later_duplicate() {
 }
 
 /// Maximal-run start behind a decoy: the 11-word duplicate reports its
-/// FULL run from `alpha`, not one word late from `beta`. Before the fix
-/// the decoy consumed the `alpha`-anchored window below the floor and the
-/// reported run started at the next window over.
+/// full run from `alpha`. Before the fix the decoy consumed the
+/// `alpha`-anchored window below the floor. The reported run then started
+/// one word late at `beta`, the next window over.
 #[test]
 fn u001_reports_the_maximal_run_start_behind_a_decoy() {
     let text = "alpha beta gamma delta epsilon zeta eta theta wrong ending. \
@@ -257,9 +255,9 @@ fn u001_reports_the_maximal_run_start_behind_a_decoy() {
 /// of times across ~1.8 MiB, every occurrence sharing the shingle hash and
 /// none reaching the floor, so no emission ever advances the scan past a
 /// run. The walk cap must keep the pass near-linear in time and flat in
-/// heap — silence is the correct verdict (9 sits below the floor), the
+/// heap. Nine words stay below the reporting floor. The
 /// shared 100 MiB peak-heap pin applies, and the generous wall-clock
-/// ceiling fails only on a quadratic blowup, not on a slow runner.
+/// ceiling fails only on a quadratic blowup. It allows slower runners.
 #[test]
 fn u001_dense_repeated_phrase_stays_bounded() {
     use std::fmt::Write as _;
@@ -293,14 +291,14 @@ fn u001_dense_repeated_phrase_stays_bounded() {
     );
 }
 
-/// Candidate ranking happens on the TOTAL run, backward extension
+/// Candidate ranking happens on the total run, backward extension
 /// included (the 0.1.6 Codex Finding-1 repro). The third passage matches
 /// two candidates: the second passage shares 11 forward words with no
 /// backward room, and the first passage shares 10 forward words plus the
-/// 5 quoted words before the anchor — a 15-word total. Ranking on forward
+/// 5 quoted words before the anchor, a 15-word total. Ranking on forward
 /// length alone picked the 11-word candidate and reported a non-maximal
-/// run; the maximal 15-word run must win. Extension deliberately ignores
-/// quotation, so the quoted lead-in words count — only anchor windows are
+/// run. The maximal 15-word run must win. Extension includes
+/// quoted words, so the lead-in words count. Only anchor windows are
 /// quote-filtered.
 #[test]
 fn u001_ranks_candidates_by_total_run_not_forward_length() {
@@ -344,8 +342,8 @@ fn u001_ranks_candidates_by_total_run_not_forward_length() {
 /// A block code fence is a run barrier (the 0.1.6 Codex Finding-2 repro):
 /// shared prose flanking DIFFERING fenced contents must not fuse into a
 /// phantom run. Each visible side here sits below the 8-word shingle
-/// floor, so any finding could only come from fusing across the fence —
-/// the exact false duplicate the barrier prevents.
+/// floor, so any finding could only come from fusing across the fence.
+/// The barrier prevents that false duplicate.
 #[test]
 fn u001_differing_fenced_contents_do_not_fuse_flanking_prose() {
     let text = "prefix alpha beta gamma delta epsilon\n\
@@ -367,13 +365,13 @@ fn u001_differing_fenced_contents_do_not_fuse_flanking_prose() {
 }
 
 /// The chain-walk recall bound, per bucket (0.1.6 Codex Finding 3,
-/// narrowed by the maximal-run polish; KNOWN-EDGES 27). One flooded
+/// narrowed by the maximal-run polish, KNOWN-EDGES 27). One flooded
 /// shingle bucket cannot mask a duplicate: 32 eight-word-aligned decoys
 /// exhaust the `alpha`-anchored walk, and the run still reports through
-/// the `beta`-anchored bucket — backward extension recovers `alpha`, so
-/// the full 10-word run lands. The ACCEPTED residual miss floods every
+/// the `beta`-anchored bucket. Backward extension recovers `alpha`, so
+/// the full 10-word run lands. The accepted residual miss floods every
 /// window of the run separately (three sub-floor decoy families of 33):
-/// the walk exhausts in all three buckets and the duplicate goes silent —
+/// the walk exhausts in all three buckets and the duplicate goes silent,
 /// the deliberate, attacker-unrealistic recall trade behind `WALK_CAP`.
 /// This half characterizes the accepted behavior without endorsing it.
 #[test]
@@ -407,7 +405,7 @@ fn u001_walk_cap_recall_is_bounded_per_bucket() {
         "the finding sits on the later copy"
     );
 
-    // Per-window flood: every bucket of the run exhausted — the accepted
+    // Per-window flood: every bucket of the run exhausted, the accepted
     // silent miss recorded in KNOWN-EDGES 27.
     let words: Vec<&str> = phrase.split(' ').collect();
     let mut text = format!("{phrase}.\n");
@@ -478,7 +476,7 @@ fn u001_clean_fixture_and_determinism() {
 
 // --- SLOP-C009 contrast-density ---------------------------------------------
 
-/// The instrument reports the figure and NEVER gates: an advisory
+/// The instrument reports the figure and never gates: an advisory
 /// coverage_hint whose message carries the computed density, with the
 /// result state untouched.
 #[test]

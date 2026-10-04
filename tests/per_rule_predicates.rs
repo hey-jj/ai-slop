@@ -76,7 +76,7 @@ fn no_word_set_rule_fires_from_inside_a_code_fence() {
         if rule.kind != MatchKindSpec::WordSet || rule.lifecycle == policy::Lifecycle::Deprecated {
             continue;
         }
-        // The injection family scans all regions by design; raw-view and
+        // The injection family scans all regions. Raw-view and
         // scoped rules are outside the prose segmentation guarantee.
         if rule.id == "SLOP-J001" || rule.view == View::Raw || rule.scope != Scope::None {
             continue;
@@ -223,8 +223,8 @@ fn w002_provenance_positives_fire_candidate_on_readme() {
 }
 
 /// Domain uses of `provenance` (data, supply-chain) still fire and reach the
-/// judge: adjudicating domain legitimacy is the human's call, never an
-/// exemption. The assertion pins presence AND tier.
+/// judge. Domain legitimacy is for a person to adjudicate and never earns an
+/// exemption. The assertion pins presence and tier.
 #[test]
 fn w002_domain_provenance_reaches_the_judge_as_candidate() {
     let config = Config::new(Profile::Readme);
@@ -238,9 +238,9 @@ fn w002_domain_provenance_reaches_the_judge_as_candidate() {
     assert_eq!(f.state, "candidate");
 }
 
-/// De-dup against W001: `reference implementation of` is W001's violation and
-/// W002 stays silent there; the bare noun phrase is W002's and W001 stays
-/// silent.
+/// De-dup against W001: the `reference implementation` noun phrase followed
+/// by a trailing `of` is W001's violation and W002 stays silent there. The
+/// bare noun phrase is W002's, and W001 stays silent.
 #[test]
 fn w002_dedups_reference_implementation_against_w001() {
     let config = Config::new(Profile::Readme);

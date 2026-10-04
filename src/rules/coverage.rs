@@ -38,12 +38,11 @@ pub fn evaluate(
         if prepared.mixed_line_endings || prepared.bom_stripped {
             hits.push(Hit::new(idx, super::document_anchor(&prepared.text)));
         }
-        // unusual_scripts_in_identifierlike_prose: a mixed-script token
-        // — Latin letters sharing a word with a cross-script homoglyph — is
-        // worth a human glance whether or not the folded form matches a
-        // lexicon word. The norm-view fold (views.rs) is what closes the
-        // evasion via the lexicon rules; this hint surfaces the oddity
-        // itself. First occurrence only.
+        // unusual_scripts_in_identifierlike_prose: Latin letters sharing a
+        // word with a cross-script homoglyph form a mixed-script token.
+        // Report its first occurrence as a hint whether or not the folded
+        // form matches a lexicon word. The norm-view fold in views.rs closes
+        // lexicon evasion. This hint exposes the script mixture for inspection.
         'scan: for (range, _) in &doc.prose_regions {
             let slice = &prepared.text[range.clone()];
             let mut i = 0usize;
@@ -54,7 +53,7 @@ pub fn evaluate(
                     continue;
                 }
                 // The maximal alphanumeric token starting here. The
-                // mixed-script verdict is computed ONCE per token; deciding
+                // mixed-script verdict is computed once per token. Deciding
                 // it per confusable char re-walked the token each time and
                 // made one giant single-script confusable run O(token^2).
                 let tlen: usize = slice[i..]

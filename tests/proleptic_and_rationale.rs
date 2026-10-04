@@ -44,7 +44,7 @@ fn c010_two_clauses_in_one_block_report() {
             f.message
         );
     }
-    // A denial with a subject reports its segment; a hedge reports the whole
+    // A denial with a subject reports its segment. A hedge reports the whole
     // comma-delimited clause. Both carry content only: no coordinator at the
     // front, no comma or terminal stop at the back. The byte offsets are
     // pinned because the span is what a reader is asked to rewrite.

@@ -46,7 +46,7 @@ fn c004_participial_while_is_temporal_and_silent() {
     }
 }
 
-/// Eight participles concede rather than report an activity, so they keep the
+/// Eight participles introduce concessions, so they keep the
 /// match.
 #[test]
 fn c004_concession_participles_are_held_out() {
@@ -193,7 +193,7 @@ fn c004_list_item_span_opens_at_the_concession_word() {
 // --- SLOP-C010 the `and`-joined denial ---------------------------------------
 
 /// A base-form denial behind `and` finishes a sentence that already named its
-/// subject, so it is a statement about that subject and not an instruction.
+/// subject. Classify it as a statement about that subject. It is declarative.
 #[test]
 fn c010_and_joined_denial_reports_arm_b() {
     for (t, span) in [
@@ -269,7 +269,7 @@ fn c010_guard_enumeration_sentence_stays_silent() {
 }
 
 /// The shape the judge settles: a real instruction wearing the four
-/// conditions, recorded in the guard rather than exempted.
+/// conditions. The guard records them, and they retain their findings.
 #[test]
 fn c010_judge_absorbed_joined_instruction_fires() {
     let t = "The tool is fast, and never replace review with it.\n";

@@ -81,19 +81,16 @@ pub const ENGINE_RULES: &[&str] = &[
     "SLOP-K008",
 ];
 
-/// The one-character span a whole-document finding anchors on. A rule that
-/// reports about the document rather than a passage still needs a span, and it
-/// takes the first character of the payload.
-///
-/// The first character can be several bytes wide. A hardcoded `0..1` cuts into
-/// an emoji, an em dash, or an accented letter, and a span that lands inside a
-/// character fails the span invariant, so the whole run exits 30 instead of
-/// reporting. An empty payload anchors on the empty span.
+/// Anchor a whole-document finding on the payload's first character.
+/// A document-level finding still needs a span. An emoji, an em dash, or
+/// an accented letter can span several bytes. A hardcoded `0..1` cuts into
+/// such a character and violates the span invariant. The whole run then
+/// exits 30. An empty payload anchors on an empty span.
 pub(crate) fn document_anchor(text: &str) -> std::ops::Range<usize> {
     0..text.chars().next().map_or(0, char::len_utf8)
 }
 
-/// Every `(rule id, param key)` the implementation actually reads — or whose
+/// Every `(rule id, param key)` the implementation actually reads, or whose
 /// behavior it implements with the policy value hardcoded (noted inline).
 /// The policy-CI param-coverage gate fails when policy.toml declares a param
 /// absent from this list and not explicitly disclosed: a declared-but-dead
@@ -112,7 +109,7 @@ pub fn implemented_param_keys() -> &'static [(&'static str, &'static str)] {
         ("SLOP-C007", "clause_window_bytes"),
         ("SLOP-C007", "imperative_openers"),
         ("SLOP-C007", "second_person"),
-        // C010 declares tool_nouns once for both rules; F004 reads it there.
+        // C010 declares tool_nouns once for both rules. F004 reads it there.
         ("SLOP-C010", "tool_nouns"),
         ("SLOP-C010", "product_names"),
         ("SLOP-C010", "imperative_negations"),
@@ -154,7 +151,7 @@ pub fn implemented_param_keys() -> &'static [(&'static str, &'static str)] {
         ("SLOP-K001", "max_title_chars"),
         ("SLOP-K001", "forbid_title_words"),
         // K002: prefix/period/imperative behavior implemented in
-        // profile_contract::evaluate; the booleans are declarations of that
+        // profile_contract::evaluate. The booleans are declarations of that
         // hardcoded behavior.
         ("SLOP-K002", "conventional_prefix"),
         ("SLOP-K002", "imperative_lowercase"),
@@ -188,7 +185,7 @@ pub fn implemented_param_keys() -> &'static [(&'static str, &'static str)] {
         ("SLOP-H002", "flag_excluded_pct"),
         ("SLOP-H003", "mixed_line_endings"),
         ("SLOP-H003", "bom_stripped"),
-        // Mixed-script token hint implemented in coverage::evaluate; the
+        // Mixed-script token hint implemented in coverage::evaluate. The
         // evasion itself is closed by the norm-view homoglyph fold (A001).
         ("SLOP-H003", "unusual_scripts_in_identifierlike_prose"),
     ]

@@ -39,7 +39,7 @@ fn recursion_report_findings_are_stable() {
         .filter(|f| f.lifecycle == "blocking" && !f.waived)
         .map(|f| f.rule_id.as_str())
         .collect();
-    // Title length plus one contrast candidate ("rather than").
+    // Title length plus one contrast candidate for the `rather than` form.
     assert_eq!(blocking, vec!["SLOP-K001", "SLOP-C003"]);
 }
 

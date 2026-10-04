@@ -16,7 +16,7 @@ fn run_stdin(args: &[&str], stdin: &[u8]) -> (i32, String, String) {
         .stderr(Stdio::piped())
         .spawn()
         .unwrap();
-    // A child asserting a usage error may exit before draining stdin; the
+    // A child asserting a usage error may exit before draining stdin. The
     // resulting EPIPE on this write is expected, not a harness failure.
     let _ = child.stdin.as_mut().unwrap().write_all(stdin);
     let out = child.wait_with_output().unwrap();
@@ -111,8 +111,8 @@ fn verify_mismatch_exits_10() {
     let dir = std::env::temp_dir().join("ai-slop-cli-test");
     std::fs::create_dir_all(&dir).unwrap();
     let approval_path = dir.join("approval.json");
-    // A clean artifact: verify re-runs the linter, so the approved bytes must
-    // actually pass, not merely match the recorded hash.
+    // Verification repeats analysis of the approved bytes. A valid hash alone
+    // cannot clear a remaining finding.
     let clean = b"Reads a file and returns its bytes.";
     let approval = serde_json::json!({
         "artifact_sha256": ai_slop::input::sha256_hex(clean),
@@ -325,7 +325,7 @@ The parser stops at the first malformed frame.\n";
 
 /// Segmentation-aware negative: a bug report whose reproducer is a 4-space
 /// INDENTED code block (no fences at all) is prose with a code block, exactly
-/// as the extractor already segments it — never unsupported input.
+/// as the extractor already segments it. The Rust source guard accepts it.
 #[test]
 fn bug_report_with_indented_reproducer_is_not_flagged_as_rust_source() {
     // Built line-by-line: a `\`-continued string literal would strip the

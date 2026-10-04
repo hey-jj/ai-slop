@@ -26,22 +26,20 @@ pub struct Hit {
     pub force_candidate: bool,
     /// Set by rules that report what they could not check.
     pub force_hint: bool,
-    /// For word-set and regex hits, the exact text the pattern matched in its
-    /// haystack (the norm view for norm-scope rules, the source otherwise).
-    /// The trigger-fidelity invariant re-renders the finding's reported
-    /// source slice and checks it still carries this trigger, so a mapping bug
-    /// fails closed as an instrumentation error rather than surfacing a finding
-    /// at the wrong bytes. `None` for structural checks that carry no trigger.
+    /// For word-set and regex hits, the exact text matched in the haystack.
+    /// Norm-scope rules use the norm view. Other rules use the source. The
+    /// trigger-fidelity check renders the reported source slice and checks
+    /// that it contains this text. A mapping mismatch returns an
+    /// instrumentation error and prevents a finding at the wrong bytes.
+    /// Structural checks carry `None` when they have no trigger.
     pub trigger: Option<String>,
-    /// For a hit found in a DECODED link destination, the
-    /// parser-decoded text of the region the span maps into. Trigger fidelity
-    /// verifies the
-    /// trigger against THIS text — exact pulldown semantics — because the raw
-    /// spelling may hide the trigger behind references outside the crate's
-    /// enumerated entity table (`&lowbar;`, `&period;`), which the
-    /// render_key bridge cannot resolve: routing such a hit through
-    /// render_key aborted the whole report as an instrumentation error
-    /// (exit 30) on exactly the inputs the decoded scan exists to catch.
+    /// For a hit in a decoded link destination, the parser-decoded text of
+    /// the region that contains the span. Trigger fidelity checks this text
+    /// with pulldown semantics. The raw spelling can hide a trigger behind
+    /// references such as `&lowbar;` and `&period;` that the enumerated
+    /// entity table cannot resolve. The render_key path returned exit 30 on
+    /// those inputs and aborted the whole report with an instrumentation
+    /// error. This field preserves the decoded text.
     pub decoded: Option<String>,
     /// Instrument figure appended to the finding message (never a trigger:
     /// it does not exist in the source, so it must not enter the
@@ -71,9 +69,9 @@ struct RxMeta {
     trim_start: usize,
     trim_end: usize,
     /// The pattern begins/ends with `\b`. The DFA matched the ASCII
-    /// `(?-u:\b)` prefilter form; the edge is re-validated against the real
+    /// `(?-u:\b)` prefilter form. The edge is re-validated against the real
     /// Unicode word-boundary rule (`is_xid_continue` XOR across the edge)
-    /// before the hit is accepted, so an ASCII boundary INSIDE a non-ASCII
+    /// before the hit is accepted, so an ASCII boundary inside a non-ASCII
     /// token ("éwhy") cannot fire. Interior `\b` occurrences stay ASCII-only:
     /// their match positions are unrecoverable from the DFA, and every policy
     /// pattern is ASCII around interior boundaries.
@@ -99,7 +97,7 @@ pub struct CompiledPolicy {
 }
 
 /// Per-call scratch caches for the lazy DFAs. The compiled machines are
-/// shared; the caches are created once per analysis.
+/// shared. The caches are created once per analysis.
 pub struct RxCaches {
     fwd: Cache,
     rev: Cache,
@@ -121,11 +119,11 @@ pub fn compiled() -> Result<&'static CompiledPolicy, String> {
 }
 
 /// Rewrite policy patterns into DFA-compatible form. `\b` becomes the ASCII
-/// word boundary (a PREFILTER — pattern-edge occurrences are re-validated
+/// word boundary (a PREFILTER, pattern-edge occurrences are re-validated
 /// against Unicode boundaries in `scan_rx`), and the two single-character
 /// look-around forms become consuming UNICODE `\w` characters with one-CHAR
 /// span trims recorded. Unicode `\w` (not ASCII) so an edge
-/// like `café--style` or `变量--值` produces a DFA candidate at all; the
+/// like `café--style` or `变量--值` produces a DFA candidate at all. The
 /// consumed char is then held to `is_xid_continue` in `scan_rx`.
 fn rewrite_pattern(p: &str) -> Result<(String, usize, usize, bool, bool), String> {
     let mut pat = p.to_string();
@@ -153,25 +151,25 @@ fn rewrite_pattern(p: &str) -> Result<(String, usize, usize, bool, bool), String
     Ok((pat, trim_start, trim_end, bound_start, bound_end))
 }
 
-/// Validate a rewritten pattern against the locked bounded-width policy and
-/// return its maximum match width in bytes.
+/// Validate a rewritten pattern against the locked bounded-width policy and return
+/// its maximum match width in bytes.
 ///
 /// The bespoke overlapping forward+reverse adapter recovers each match start
-/// with a reverse search; on an unbounded-width pattern that window is the
+/// with a reverse search. On an unbounded-width pattern that window is the
 /// whole region and a run of overlapping match ends makes it quadratic
 /// (`turn\d+...\d+` measured ~12s at 256KB). The dependency decision therefore
-/// bans EVERY unbounded-width quantifier (`*`, `+`, `{n,}`) at policy build —
-/// whitespace included. Unbounded whitespace is NOT exempt: a pattern ending in
+/// bans every unbounded-width quantifier (`*`, `+`, `{n,}`) at policy build,
+/// whitespace included. Unbounded whitespace is not exempt: a pattern ending in
 /// `\s+` (e.g. Q001's `\?\s+`) manufactures a fresh match end at every
 /// whitespace byte, each an O(region) reverse scan, which reproduces the exact
 /// quadratic (a `\?\s+` tail measured 10.66s at 256KB). Bounded forms are
-/// required everywhere: `.*`/`\d+`/`\w+` → `[^.\r\n]{0,120}` and friends;
+/// required everywhere: `.*`/`\d+`/`\w+` → `[^.\r\n]{0,120}` and friends.
 /// `\s+`/`\s*` → `\s{1,N}`/`\s{0,N}`.
 ///
-/// `Ok(Some(w))` is the pattern's max match width in bytes; `Ok(None)` only for
-/// the degenerate case where the HIR reports no finite maximum despite being
-/// bounded (it never arises for a fully bounded pattern, but the reverse-scan
-/// caller falls back safely). `Err` is a banned pattern or a parse failure.
+/// `Ok(Some(w))` gives the maximum width in bytes. `Ok(None)` covers a HIR
+/// without a finite maximum. Fully bounded patterns have a finite maximum,
+/// and the caller falls back to the region bound otherwise. `Err` indicates a
+/// banned pattern or parse failure.
 fn validate_bounded_width(pat: &str) -> Result<Option<usize>, String> {
     let hir = regex_syntax::parse(pat)
         .map_err(|e| format!("pattern {pat} failed width-validation parse: {e}"))?;
@@ -257,7 +255,7 @@ fn build() -> Result<CompiledPolicy, String> {
         .multi_line(true);
     // One multi-pattern machine with MatchKind::All. The lazy DFA is used
     // because full determinization of the bounded-window patterns
-    // (`.{1,160}` under an unanchored prefix) is exponential; laziness keeps
+    // (`.{1,160}` under an unanchored prefix) is exponential. Laziness keeps
     // the same automaton semantics while materializing only reachable
     // states, with the cache size as the load-time bound.
     let fwd = DFA::builder()
@@ -330,7 +328,7 @@ fn word_bounded(hay: &str, span: &Range<usize>) -> bool {
 }
 
 /// Real Unicode word boundary at `at`: exactly one side of the position is a
-/// word (xid_continue) character — the Unicode analog of `\b`, sharing
+/// word (xid_continue) character, the Unicode analog of `\b`, sharing
 /// `word_bounded`'s character class. Out-of-text sides count as non-word.
 fn unicode_word_boundary(hay: &str, at: usize) -> bool {
     let before = hay[..at]
@@ -355,7 +353,7 @@ fn exempted(hay: &str, span: &Range<usize>, phrases: &[String]) -> bool {
     let win_end =
         crate::widen_to_char_boundaries(hay, span.end..(span.end + 60).min(hay.len())).end;
     let window = hay[win_start..win_end].to_lowercase();
-    // Lowercasing can change byte lengths for non-ASCII; recompute the match
+    // Lowercasing can change byte lengths for non-ASCII. Recompute the match
     // position by lowercasing the prefix.
     let rel_start = hay[win_start..span.start].to_lowercase().len();
     let rel_end = rel_start + hay[span.start..span.end].to_lowercase().len();
@@ -373,16 +371,15 @@ fn exempted(hay: &str, span: &Range<usize>, phrases: &[String]) -> bool {
     false
 }
 
-/// Case-SENSITIVE covering-literal check for `profile_exemptions`: true when
-/// one of `literals`, spelled exactly and standing alone as a verdict token,
-/// contains the hit span. The caller passes the run profile's literal list,
-/// so profile scoping is already resolved. Shared by the word-set path
-/// (`accept_word_hit`) and the regex path (`scan_rx`).
+/// Case-sensitive covering-literal check for `profile_exemptions`. A literal
+/// must contain the hit span and stand alone as a verdict token. The caller
+/// supplies the current profile's literals. Both the word-set and regex paths
+/// use this check through `accept_word_hit` and `scan_rx`.
 ///
 /// A covering literal only exempts a STANDALONE token:
 /// - its edges sit on word boundaries in `hay`, so an embedded spelling
-///   (`AVOCA[DO NOT BUILD] LIST`) never covers anything; and
-/// - it is not continued by a following word — a verdict label ends at end
+///   (`AVOCA[DO NOT BUILD] LIST`) never covers anything.
+/// - it is not continued by a following word. A verdict label ends at end
 ///   of text, a line break, punctuation, or a table-cell `|`, never at a
 ///   continuing alphanumeric word, so `We DO NOT BUILD trust by ...` stays
 ///   a finding.
@@ -416,11 +413,11 @@ fn exempted_cs(hay: &str, span: &Range<usize>, literals: &[String]) -> bool {
     false
 }
 
-/// True when the text after a covering literal reads as the END of a
+/// True when the text after a covering literal reads as the end of a
 /// standalone token: end of text, a line break, punctuation, or a table-cell
-/// `|` — possibly after a short inline space run — but never an alphanumeric
+/// `|`, possibly after a short inline space run, but never an alphanumeric
 /// continuation word. The peek is bounded at 8 space/tab units, mirroring
-/// the parsers' whitespace bound; a longer run reads as layout, and layout
+/// the parsers' whitespace bound. A longer run reads as layout, and layout
 /// ends a label.
 fn standalone_token_end(hay: &str, from: usize) -> bool {
     let mut seen = 0usize;
@@ -594,7 +591,7 @@ pub fn scan_all(
     // 8c. Decoded link destinations: where the raw spelling hides the
     // pattern behind backslash escapes or character references the parser (or
     // the browser, for autolinks) resolves, run the link-URL rules over the
-    // DECODED text too and map each hit back onto the raw region.
+    // decoded text too and map each hit back onto the raw region.
     for (r, decoded) in &doc.link_url_decoded {
         scan_link_url_decoded(cp, &mut caches, config, src, r, decoded, &mut hits)?;
     }
@@ -772,7 +769,7 @@ fn accept_word_hit(
     }
     // A rule may anchor part of its lexicon instead of all of it. Entries
     // listed in `match.params.block_start_only` fire only where they open a
-    // sentence, a line, or a list item; the rest of the same lexicon is read
+    // sentence, a line, or a list item. The rest of the same lexicon is read
     // anywhere. Only a matched span reaches here, so the list costs nothing
     // to consult.
     if let Some(anchored) = rule
@@ -818,10 +815,9 @@ fn accept_word_hit(
             }
         }
     }
-    // Widen in the coordinate system the span lives in — see `scan_rx`. A Norm
-    // hit maps through `to_source` (source coords, widened against `src`); every
-    // other context matched in `hay` and is widened against `hay` (the caller
-    // rebases a slice-local span afterward).
+    // Widen each span in its own coordinate system, as in `scan_rx`. Norm hits map through
+    // `to_source` and widen against `src`. Other hits widen against `hay`.
+    // The caller then rebases slice-local spans.
     let source_span = match (ctx, norm) {
         (ScanCtx::Norm, Some(n)) => match n.to_source(span.clone()) {
             Some(s) => crate::widen_to_char_boundaries(src, s),
@@ -835,9 +831,9 @@ fn accept_word_hit(
     let mut hit = Hit::new(rule_idx, source_span);
     hit.field = field;
     hit.quoted = quoted;
-    // A match inside a FULLY-folded single-script token (no Latin
-    // witness; folded because every char was a table confusable) is the
-    // conservative candidate path — the rare genuine foreign word that folds
+    // A match inside a fully-folded single-script token (no Latin
+    // witness, folded because every char was a table confusable) is the
+    // conservative candidate path, the rare genuine foreign word that folds
     // onto an English lexicon term must reach a judge, not hard-block.
     if let (ScanCtx::Norm, Some(n)) = (ctx, norm) {
         if n.span_has_flag(&span, crate::extract::F_FULL_FOLD) {
@@ -849,10 +845,10 @@ fn accept_word_hit(
 }
 
 /// Run the link-URL passes (case-insensitive word set, case-sensitive
-/// word set, regex set) over the DECODED text of one link destination, then
+/// word set, regex set) over the decoded text of one link destination, then
 /// map each hit back into source coordinates: the exact position of the
 /// matched trigger inside the raw region when it occurs there literally,
-/// else the whole region as the fail-safe (fidelity-safe — `render_key` resolves
+/// else the whole region as the fail-safe (fidelity-safe, `render_key` resolves
 /// the escape/reference spellings, so the whole-region slice still renders
 /// to the trigger).
 fn scan_link_url_decoded(
@@ -895,7 +891,7 @@ fn scan_link_url_decoded(
     for mut hit in sub {
         let trigger = match &hit.trigger {
             Some(t) => t.clone(),
-            // The cs word-set pass records no trigger; the decoded slice at
+            // The cs word-set pass records no trigger. The decoded slice at
             // the hit's span is the matched text.
             None => match decoded.get(hit.span.clone()) {
                 Some(t) => t.to_string(),
@@ -950,8 +946,8 @@ fn scan_rx(
         // Bound the reverse start-recovery window by the pattern's max width.
         // The true start is at most `max_width` bytes before `end`, so a
         // window of that size always contains it while capping each reverse
-        // search at O(width) instead of O(region) — the fix for the quadratic
-        // adapter. Every policy pattern is bounded, so this always bites; the
+        // search at O(width) instead of O(region), the fix for the quadratic
+        // adapter. Every policy pattern is bounded, so this always bites. The
         // region-bound fallback is dead-defensive.
         let rev_lo = match meta.max_width {
             Some(w) => region.start.max(end.saturating_sub(w)),
@@ -972,11 +968,11 @@ fn scan_rx(
             continue;
         }
         // The DFA matched with ASCII-boundary and Unicode-`\w` PREFILTER
-        // forms; validate each candidate's edges against real Unicode word
+        // forms. Validate each candidate's edges against real Unicode word
         // boundaries before accepting. A trimmed look-around edge consumed
-        // one CHAR (possibly multi-byte) that must be a genuine word char;
-        // a pattern-edge `\b` must sit at a genuine boundary — an ASCII
-        // boundary inside one xid token ("éwhy") is rejected here.
+        // one CHAR (possibly multi-byte) that must be a genuine word char.
+        // A pattern-edge `\b` must sit at a genuine boundary. An ASCII
+        // boundary inside one xid token (`éwhy`) is rejected here.
         let mut mstart = start;
         let mut mend = end;
         if meta.trim_start > 0 {
@@ -1008,9 +1004,8 @@ fn scan_rx(
                 if hay[span.clone()].starts_with('\u{3010}') && cjk_present(&hay[span.clone()]) {
                     continue;
                 }
-                // Guard promise: a dagger-digit pair that BEGINS its
-                // line is a footnote definition, not inline citation
-                // residue — exempt. Inline dagger-digit pairs still fire.
+                // A dagger-digit pair at line start defines a footnote and
+                // receives the policy exemption. Inline pairs still fire.
                 if hay[span.clone()].starts_with(['†', '‡']) {
                     let ls = hay[..span.start].rfind('\n').map(|p| p + 1).unwrap_or(0);
                     if hay[ls..span.start].trim().is_empty() {
@@ -1038,7 +1033,7 @@ fn scan_rx(
             }
             "SLOP-C004" => {
                 // Sentence-start arm only: that alternation's span begins
-                // with the consumed [.!?] boundary; the line-start arm never
+                // with the consumed [.!?] boundary. The line-start arm never
                 // starts on punctuation.
                 let first = hay[span.clone()].chars().next();
                 if matches!(first, Some('.' | '!' | '?')) {
@@ -1063,7 +1058,7 @@ fn scan_rx(
                         }
                     }
                     // An abbreviation or mid-sentence period ("e.g. while
-                    // ...") is not a sentence end — SLOP-C007's terminal
+                    // ...") is not a sentence end, SLOP-C007's terminal
                     // test, reused, decides.
                     if first == Some('.')
                         && !crate::rules::contrast::period_is_terminal(hay, span.start + 1)
@@ -1119,8 +1114,8 @@ fn scan_rx(
         // Widen to char boundaries in the coordinate system the span lives in.
         // A Norm hit's `to_source` already returns source coordinates, widened
         // against `src`. Every other context matched inside `hay`, so the span
-        // is in `hay` coordinates (== `src` for whole-source scans; a heading
-        // SLICE otherwise) and must be widened against `hay` — the heading loop
+        // is in `hay` coordinates (== `src` for whole-source scans, a heading
+        // slice otherwise) and must be widened against `hay`. The heading loop
         // rebases the slice-local span to source coords AFTER this returns.
         // Widening a heading-local span against the full `src` dragged a heading
         // span end across a multi-byte char sitting at the same byte offset near
@@ -1174,7 +1169,7 @@ mod bounded_width_tests {
 
     // F2: the whitespace exemption is gone. A pattern whose match can END on an
     // unbounded whitespace run is exactly what made the adapter quadratic, so
-    // the gate must reject it — no class is exempt.
+    // the gate must reject it, no class is exempt.
     #[test]
     fn unbounded_trailing_whitespace_is_rejected() {
         assert!(

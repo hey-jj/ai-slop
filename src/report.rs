@@ -1,6 +1,6 @@
 //! Output schema, deterministic ordering, escaping, and the emit-time span
-//! invariant. A mapping bug becomes `instrumentation_error`, never a wrong
-//! finding.
+//! invariant. A mapping bug returns `instrumentation_error`. It emits no
+//! finding at the wrong bytes.
 
 use crate::engine::{CompiledPolicy, Hit};
 use crate::extract::{Doc, RegionKind};
@@ -133,38 +133,36 @@ pub fn escape_json_string(s: &str) -> String {
     out
 }
 
-/// Trigger fidelity: does the reported source span still carry the `trigger`
-/// the pattern matched? Two independent reconstructions of what the span renders
-/// to are checked, and EITHER carrying the trigger passes.
+/// Check whether the reported source span renders the matched `trigger`.
+/// Check the independent raw and norm reconstructions, plus decoded link text.
+/// Accept containment in any reconstruction.
 ///
-/// `raw_slice` is the raw source bytes re-rendered through `render_key`
-/// (entity/escape decode, zero-width and HTML-markup removal, NFC, whitespace-
-/// run folding, ASCII case-folding); it covers non-norm hits (raw/code/link/
-/// heading scans) whose span never went through a mapping. `norm_text` is the
-/// norm text the source span overlaps, assembled by `source_span_norm_text` with
-/// every exclusion (inline and fenced code, HTML markup, link URLs, autolinks)
-/// and mapping (entities, escapes, softbreaks, owned content) applied — Identity
-/// segments CLIPPED to their actual source-overlap sub-slice, Mapped segments
-/// contributing their whole norm text. It is computed for every hit (norm or
-/// not); the clip is what stops a span displaced onto one byte of a
-/// trigger-bearing paragraph from inheriting the paragraph's text and passing.
+/// `raw_slice` renders source bytes through `render_key`: entity and escape
+/// decoding, zero-width and HTML-markup removal, NFC, whitespace-run folding,
+/// and ASCII case folding. It covers non-norm raw, code, link, and heading hits
+/// whose spans bypass mapping.
 ///
-/// The test is CONTAINMENT, not equality: a Mapped segment expands to its whole
-/// source range, so a legitimate span surrounds the trigger. A span no
-/// reconstruction carries is a mapping bug. An empty trigger key (all
-/// markup/whitespace) is unverifiable and accepted.
+/// `norm_text` uses `source_span_norm_text` with every exclusion applied:
+/// inline and fenced code, HTML markup, link URLs, and autolinks. Its mappings
+/// include entities, escapes, softbreaks, and owned content. Identity segments
+/// contribute only their source-overlap sub-slice. Mapped segments contribute
+/// their whole norm text. Compute this reconstruction for every hit, including
+/// non-norm hits. Clipping prevents a displaced one-byte span from inheriting
+/// a trigger-bearing paragraph's text and passing.
 ///
-/// `decoded` is the third reconstruction, for hits found in a
-/// DECODED link destination: the parser-decoded text of the region the span
-/// maps into, carried on the hit. It is checked by direct containment — the
-/// exact pulldown decode, no entity-table dependence — because the raw
-/// spelling may hide the trigger behind references OUTSIDE the crate's
-/// enumerated table (`&lowbar;`, `&period;`), which `render_key` cannot
-/// resolve; routing those spans through the render_key bridge aborted the
-/// whole report (exit 30) on exactly the entity-hidden tracking URLs the
-/// decoded scan exists to catch. Like the norm-text reconstruction, the
-/// engine binds `decoded` to the hit's own region, so it vouches only for
-/// the span it maps to. Empty when the hit is not from the decoded pass.
+/// A Mapped segment expands to its whole source range, so containment accepts
+/// a legitimate span surrounding the trigger. A trigger absent from every
+/// reconstruction indicates a mapping bug. Accept an unverifiable empty
+/// trigger key composed only of markup or whitespace.
+/// `decoded` carries parser-decoded link text from the hit's own region. Check
+/// it by direct containment with exact pulldown decoding and no entity-table
+/// dependence. The raw spelling can hide a trigger behind references outside
+/// the enumerated table, including `&lowbar;` and `&period;`. `render_key`
+/// cannot resolve them. That path aborted the whole report with exit 30 on
+/// the entity-hidden tracking URLs the decoded scan exists to catch. The
+/// engine binds both norm text and decoded text to the hit's own region, so
+/// they verify only the mapped span. Pass an empty `decoded` argument for a
+/// hit outside the decoded pass.
 fn slice_carries_trigger(raw_slice: &str, norm_text: &str, decoded: &str, trigger: &str) -> bool {
     if !decoded.is_empty() && decoded.contains(trigger) {
         return true;
@@ -265,9 +263,9 @@ fn waiver_decision(
             }
         }
         // The authority floor is the single shared decision in
-        // `waiver::floor_allows`; the interactive path and `verify` cannot
+        // `waiver::floor_allows`. The interactive path and `verify` cannot
         // drift because both consult it. A waiver is human-privileged only
-        // when it names the recognized human signer; an absent or
+        // when it names the recognized human signer. An absent or
         // unrecognized `signer_kind` is untrusted and gets at most agent
         // privilege.
         let authority = config
@@ -321,7 +319,7 @@ pub fn assemble(
             continue;
         }
         // Quotation suppression: rules in this list drop their quoted hits
-        // entirely — a candidate-tier rule has no lower blocking state to
+        // entirely. A candidate-tier rule has no lower blocking state to
         // downgrade to, and a quoted idiom is the quoted author's diction.
         if hit.quoted && cp.pkg.quotation_suppress.iter().any(|id| id == &rule.id) {
             continue;
@@ -371,15 +369,13 @@ pub fn assemble(
         notes.extend(decision.notes);
 
         let snippet = snippet_raw(src, &hit.span)?;
-        // Trigger fidelity: the reported source slice, re-rendered through
-        // the same view transforms, must still carry the trigger the pattern
-        // matched. The comparison is whitespace-run-folded and case-folded via
-        // `render_key`, and by CONTAINMENT rather than equality — a Mapped
-        // segment expands `to_source` to its whole source range, so the slice
-        // legitimately surrounds the trigger (softbreaks, entities, escapes,
-        // inline-tag fusion, owned content). A slice that does not carry the
-        // trigger is a mapping bug: fail closed as instrumentation rather than
-        // emit a finding at the wrong bytes.
+        // Trigger fidelity renders the reported source slice through the same
+        // view transforms and checks that it contains the matched trigger.
+        // `render_key` folds whitespace runs and case. A Mapped segment
+        // expands to its whole source range, so the slice can surround the
+        // trigger after softbreaks, entity decoding, escapes, inline tags, or
+        // owned content. A missing trigger indicates a mapping bug and
+        // returns an instrumentation error without emitting a finding at the wrong bytes.
         if let Some(trigger) = &hit.trigger {
             if !slice_carries_trigger(
                 &src[hit.span.clone()],
@@ -535,13 +531,13 @@ mod trigger_fidelity_tests {
     // (empty norm-text arg, as a non-norm hit would supply).
     #[test]
     fn raw_slice_legitimate_divergences_verify() {
-        // Softbreak: norm folds "\n" to a space; the source keeps the newline.
+        // Softbreak: norm folds "\n" to a space. The source keeps the newline.
         assert!(slice_carries_trigger("not\njust", "", "", "not just"));
         // Enumerated entity: to_source expands the Mapped em-dash to `&mdash;`.
         assert!(slice_carries_trigger("a&mdash;b", "", "", "a\u{2014}b"));
         // Backslash escape resolved in the norm view.
         assert!(slice_carries_trigger(r"foo\*bar", "", "", "foo*bar"));
-        // Inline-tag fusion: the norm reads "delve", the slice carries markup.
+        // Inline-tag fusion: the norm reads `delve`, the slice carries markup.
         assert!(slice_carries_trigger("de<b></b>lve", "", "", "delve"));
         // Element-boundary space kept across inline markup.
         assert!(slice_carries_trigger(
@@ -562,12 +558,12 @@ mod trigger_fidelity_tests {
     }
 
     // An INVERSION of an earlier premise. Without the barrier, the norm view
-    // fused "de"+"lve" across the excluded inline-code gap into "delve", and
+    // fused `de`+`lve` across the excluded inline-code gap into `delve`, and
     // the norm-text reconstruction certified that fusion as a legitimate
-    // finding. That fusion WAS the SLOP-A001 false positive — the reader sees
-    // "de x lve", never "delve" — so the inline-code barrier interposes U+FFFD
-    // in the norm view, and the pipeline supplies "de\u{FFFD}lve" (not
-    // "delve") as the span's norm text. A hit assembled across inline code can
+    // finding. That fusion WAS the SLOP-A001 false positive, the reader sees
+    // `de x lve`, never `delve`, so the inline-code barrier interposes U+FFFD
+    // in the norm view, and the pipeline supplies `de\u{FFFD}lve` (not
+    // `delve`) as the span's norm text. A hit assembled across inline code can
     // no longer exist, and were one ever produced, trigger fidelity fails it
     // closed.
     #[test]
@@ -579,7 +575,7 @@ mod trigger_fidelity_tests {
             "",
             "delve"
         ));
-        // A gross desync still fails BOTH reconstructions.
+        // A gross desync still fails both reconstructions.
         assert!(!slice_carries_trigger("de`x`lve", "parser", "", "delve"));
         // The norm-text path itself still works where the norm LEGITIMATELY
         // diverges from the raw slice: a decoded entity's norm text verifies
@@ -596,15 +592,14 @@ mod trigger_fidelity_tests {
         assert!(!slice_carries_trigger("", "", "", "delve"));
     }
 
-    // A hit from the decoded-destination pass verifies against
-    // the PARSER-decoded text — full HTML5 entity semantics — where the
-    // render_key bridge (enumerated entity table only) cannot resolve the
-    // raw spelling. Routed through render_key instead, this shape would
-    // abort the whole report (exit 30).
+    // Check decoded-destination hits against parser-decoded text with HTML5
+    // entity semantics. The enumerated table in `render_key` cannot resolve
+    // every reference, and that path would abort the whole report with exit 30
+    // on this input.
     #[test]
     fn decoded_destination_reconstruction_verifies_outside_entity_table() {
-        // Raw slice spells `&lowbar;`; render_key leaves it literal, so the
-        // raw path fails — the decoded text carries the trigger.
+        // Raw slice spells `&lowbar;`. Render_key leaves it literal, so the
+        // raw path fails. The decoded text carries the trigger.
         assert!(slice_carries_trigger(
             "https://e/?utm&lowbar;source=chatgpt",
             "",
